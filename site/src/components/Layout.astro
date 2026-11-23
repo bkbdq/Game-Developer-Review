@@ -1,11 +1,13 @@
 ---
 import '../styles/site.css';
 import '../styles/discovery.css';
+import BrandMark from './BrandMark.astro';
 import { href, isDemo } from '../lib/data';
+import { navigationMark } from '../lib/discovery-marks';
 import { surveyUrl } from '../lib/survey';
 const { title, active, dark = false, company, project } = Astro.props;
 const brand = 'goodcorp';
-const routes = [['projects','','项目发现'],['companies','companies/','公司目录'],['arcade','arcade/','夜班投递']];
+const routes = [['projects','','项目发现'],['companies','companies/','公司目录']];
 ---
 <!doctype html>
 <html lang="zh-CN">
@@ -17,7 +19,7 @@ const routes = [['projects','','项目发现'],['companies','companies/','公司
   <body class:list={{'discovery-theme':dark}}>
     <a class="skip" href="#content">跳到正文</a>
     <header class="topbar"><div class="shell bar-inner">
-      <a class="brand" href={href()}><span class="gc-logo" aria-hidden="true"><i></i><i></i></span>{brand}</a>
+      <a class="brand" href={href()}><BrandMark mark={navigationMark} />{brand}</a>
       <nav aria-label="主导航">{routes.map(([key,path,text])=><a class="nav-link" aria-current={active===key?'page':undefined} href={href(path)}>{text}</a>)}</nav>
       <div class="bar-actions">
         {isDemo && <span class="demo"><i></i>本地演示</span>}

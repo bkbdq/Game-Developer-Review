@@ -26,7 +26,7 @@ interface Index {
   generatedAt: string; totals: { companies: number; projects: number; reviews: number }; companies: Summary[];
 }
 
-export const isDemo = process.env.SITE_DEMO === '1';
+export const isDemo = import.meta.env.GOODCORP_DEV_SERVER && process.env.SITE_DEMO === '1';
 const directory = process.env.REVIEW_DATA_DIR || resolve('public/data/v1');
 function read<T>(name: string): T {
   const value = JSON.parse(readFileSync(resolve(directory, name + '.json'), 'utf8'));

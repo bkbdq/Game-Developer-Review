@@ -1,7 +1,4 @@
 ---
-import Layout from '../components/Layout.astro';
-import NightCourier from '../components/NightCourier.astro';
+import { href } from '../lib/data';
+return Astro.redirect(href(), 302);
 ---
-<Layout title="夜班投递" active="arcade" dark>
-  <section class="arcade-page"><NightCourier /></section>
-</Layout>

@@ -1,0 +1,38 @@
+.discovery-header[data-layout="right"] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 39%) auto;
+  grid-template-areas: "title motto mark" "purpose search search" "counts search search";
+  gap: 6px 16px;
+  background: linear-gradient(90deg, #76ced0 28px, transparent 28px 32px, #76ced0 32px 36px, transparent 36px) left bottom / 100% 2px no-repeat;
+}
+.discovery-header[data-layout="right"] .header-motto { padding-inline-start: 12px; border-inline-start: 2px solid #79d1cc; }
+
+.discovery-header[data-layout="wide"] {
+  grid-template-columns: auto max-content minmax(0, 1fr) minmax(0, 40%);
+  grid-template-areas: "mark title counts motto" "mark purpose purpose motto" "search search search search";
+  gap: 6px 18px;
+}
+.discovery-header[data-layout="wide"] .header-counts {
+  justify-self: start;
+  padding-inline-start: 14px;
+  border-inline-start: 1px solid #526b77;
+}
+.discovery-header[data-layout="wide"] .header-motto { padding: 0; border: 0; text-align: end; }
+.discovery-header[data-layout="wide"] .motto-zh { color: #d3e3dd; }
+.discovery-header[data-layout="wide"] .project-search { margin-top: 8px; }
+.discovery-header[data-layout="wide"] .search-field { border-inline-start: 3px solid #79d1cc; background-color: #172e3d; }
+
+@media (max-width: 740px) {
+  .discovery-header[data-layout="right"] {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "title mark" "purpose purpose" "counts counts" "motto motto" "search search";
+    gap: 5px 12px;
+  }
+  .discovery-header[data-layout="right"] .header-motto { margin-top: 6px; }
+  .discovery-header[data-layout="wide"] {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "mark title" "purpose purpose" "counts counts" "search search" "motto motto";
+    gap: 5px 12px;
+  }
+  .discovery-header[data-layout="wide"] .header-counts { border: 0; padding: 0; }
+  .discovery-header[data-layout="wide"] .header-motto { margin-top: 5px; text-align: start; }
+}

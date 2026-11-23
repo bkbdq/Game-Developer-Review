@@ -106,7 +106,6 @@ function setupFeatured(feature: HTMLElement) {
 
 export function setupDiscovery() {
   const home=document.querySelector<HTMLElement>('.discover-home')!;
-  if(location.hash==='#arcade-title'){location.replace(home.dataset.arcadeUrl!);return;}
   const feature=home.querySelector<HTMLElement>('[data-featured]');
   if(feature) setupFeatured(feature);
   const box=home.querySelector<HTMLElement>('[data-project-search]')!;

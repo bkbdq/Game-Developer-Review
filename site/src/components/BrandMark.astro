@@ -1,0 +1,23 @@
+---
+import { href } from '../lib/data';
+import type { DiscoveryMark } from '../lib/discovery-marks';
+
+interface Props {
+  mark: DiscoveryMark;
+  alt?: string;
+  class?: string;
+  sizes?: string;
+}
+const { mark, alt = '', class: className, sizes = '68px' } = Astro.props;
+const photo = 'sources' in mark ? mark : undefined;
+const srcset = photo && [{ image: photo.image, width: photo.width }, ...photo.sources]
+  .map(({ image, width }) => `${href(image)} ${width}w`)
+  .join(', ');
+---
+<img class:list={['brand-mark', className, photo ? 'photo-mark' : 'pixel-mark']}
+  src={href(mark.image)} srcset={srcset} sizes={photo ? sizes : undefined}
+  width={photo?.width ?? 34} height={photo?.height ?? 30} alt={alt} />
+<style>
+  .brand-mark { display: block; flex: none; width: var(--brand-mark-width, 68px); height: auto; }
+  .pixel-mark { image-rendering: pixelated; }
+</style>

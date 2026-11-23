@@ -1,5 +1,6 @@
 ---
 import Layout from '../components/Layout.astro';
+import BrandMark from '../components/BrandMark.astro';
 import ProjectTile from '../components/ProjectTile.astro';
 import DiscoverySearch from '../components/DiscoverySearch.astro';
 import FeaturedProjects from '../components/FeaturedProjects.astro';
@@ -7,13 +8,32 @@ import { projects, recentPicks, asOf } from '../lib/projects';
 import { isRecentPick, minimumPositiveRatio, minimumPickScore } from '../lib/project-stats';
 import { index, href } from '../lib/data';
 import { getBoardPageSizes } from '../lib/project-board';
+import { defaultDiscoveryMark, type DiscoveryMark } from '../lib/discovery-marks';
 import { surveyUrl } from '../lib/survey';
+import '../styles/discovery-header.css';
 import '../styles/project-board.css';
+interface Props {
+  previewLayout?: 'right' | 'wide' | 'left';
+  previewMark?: DiscoveryMark;
+}
+const { previewLayout = 'left', previewMark = defaultDiscoveryMark } = Astro.props;
 const boardPages = getBoardPageSizes(recentPicks.length);
 ---
 <Layout title="项目发现" active="projects" dark>
-  <div class="discover-home" data-arcade-url={href('arcade/#arcade-title')}>
-    <header class="discovery-intro"><div><h1>项目发现</h1><p class="discovery-purpose">匿名评价游戏公司，帮后来者少踩坑，也帮好团队被看见。</p><p>{index.totals.companies} 家公司 <span>·</span> {projects.length} 个游戏项目</p></div><DiscoverySearch/></header>
+  <div class="discover-home">
+    <header class="discovery-header" data-layout={previewLayout}>
+      <h1>项目发现</h1>
+      <p class="header-purpose">匿名评价游戏公司，帮后来者少踩坑，<span>也帮好团队被看见。</span></p>
+      <p class="header-counts"><b>{index.totals.companies}</b> 家公司 <span>·</span> <b>{projects.length}</b> 个游戏项目</p>
+      <div class="header-motto">
+        <p lang="en">I am a game developer. <span>But in my heart, <em>I am a gamer.</em></span></p>
+        <p class="motto-zh"><span>这行可以更好，</span><span>一起改变.</span></p>
+      </div>
+      <BrandMark class="header-mark" mark={previewMark} alt={previewMark.name}
+        sizes="clamp(96px, 8vw + 70px, 168px)" />
+      <DiscoverySearch />
+    </header>
+    <slot name="mark-options" />
     <FeaturedProjects/>
     <section id="projects" class="project-library" aria-labelledby="library-title">
       <div class="discovery-section-head"><h2 id="library-title" tabindex="-1"><span data-library-title>近期好评项目</span><small data-result-count>{recentPicks.length}</small></h2>

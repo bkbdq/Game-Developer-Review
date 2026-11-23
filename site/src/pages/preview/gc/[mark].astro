@@ -1,0 +1,47 @@
+---
+import Discovery from '../../index.astro';
+import BrandMark from '../../../components/BrandMark.astro';
+import { href } from '../../../lib/data';
+import { discoveryMarks, type DiscoveryMark } from '../../../lib/discovery-marks';
+
+export function getStaticPaths() {
+  if (!import.meta.env.GOODCORP_DEV_SERVER) return [];
+  return discoveryMarks.map(mark => ({ params: { mark: mark.id }, props: { mark } }));
+}
+
+interface Props { mark: DiscoveryMark }
+const { mark } = Astro.props;
+---
+<Discovery previewMark={mark}>
+  <nav slot="mark-options" class="gc-options" aria-label="切换页头 GC 标志">
+    <h2>GC 标志对比</h2>
+    <div class="gc-options-grid">
+      {discoveryMarks.map(option => (
+        <a href={href('preview/gc/' + option.id + '/')} aria-current={option.id === mark.id ? 'page' : undefined}>
+          <BrandMark mark={option} sizes="(max-width: 600px) 68px, 102px" />
+          <span>{option.name}</span>
+        </a>
+      ))}
+    </div>
+  </nav>
+</Discovery>
+<style>
+  .gc-options { display: block; padding: 5px 0 24px; }
+  .gc-options h2 { margin-bottom: 12px; font-size: 1.125rem; color: #e3eef2; }
+  .gc-options-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+  .gc-options a {
+    --brand-mark-width: 102px;
+    display: grid; justify-items: center; align-content: center; gap: 10px;
+    padding: 14px 4px 11px; border: 1px solid #3c5564; border-radius: 4px;
+    background: #172b39; color: #c9dbe3; font-size: .875rem; line-height: 1.4;
+  }
+  .gc-options a:hover { background: #203847; border-color: #728f9e; }
+  .gc-options a[aria-current="page"] {
+    background: #203d49; border-color: #8cdbd5; box-shadow: inset 0 -2px #8cdbd5; color: #f1fcfa;
+  }
+  @media (max-width: 920px) { .gc-options-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 600px) {
+    .gc-options-grid { gap: 6px; }
+    .gc-options a { --brand-mark-width: 68px; gap: 6px; padding: 10px 2px 8px; font-size: .8125rem; }
+  }
+</style>

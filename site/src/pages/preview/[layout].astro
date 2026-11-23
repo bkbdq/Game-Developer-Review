@@ -1,0 +1,14 @@
+---
+import Discovery from '../index.astro';
+import '../../styles/discovery-previews.css';
+
+export function getStaticPaths() {
+  if (!import.meta.env.GOODCORP_DEV_SERVER) return [];
+  return (['right', 'wide', 'left'] as const).map(layout => ({
+    params: { layout }, props: { layout },
+  }));
+}
+
+const { layout } = Astro.props;
+---
+<Discovery previewLayout={layout} />

@@ -111,7 +111,7 @@ function validateReview(fileName, companyId, company, taxonomy, seenIds) {
   if (!review) return;
   if (review.schemaVersion !== 1) fail(`${label}：schemaVersion 必须为 1`);
   checkKeys(review, [
-    'schemaVersion', 'id', 'companyId', 'projectId', 'score', 'title',
+    'schemaVersion', 'id', 'companyId', 'projectId', 'projectAnonymous', 'score', 'title',
     'comment', 'profile', 'tags', 'publishedAt', 'revision',
   ], label);
   if (!/^rv_[A-Za-z0-9]+$/.test(review.id || '')) fail(`${label}：id 不合法`);
@@ -119,6 +119,12 @@ function validateReview(fileName, companyId, company, taxonomy, seenIds) {
   if (seenIds.has(review.id)) fail(`${label}：评价 id 重复 ${review.id}`);
   seenIds.add(review.id);
   if (review.companyId !== companyId) fail(`${label}：companyId 必须与目录一致`);
+  if (review.projectAnonymous !== undefined && review.projectAnonymous !== true) {
+    fail(`${label}：projectAnonymous 只能为 true`);
+  }
+  if (review.projectAnonymous && review.projectId !== undefined) {
+    fail(`${label}：匿名项目评价不能同时关联 projectId`);
+  }
   if (review.projectId !== undefined && !company.projectIds.has(review.projectId)) {
     fail(`${label}：projectId ${review.projectId} 不存在于公司项目列表`);
   }

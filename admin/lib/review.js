@@ -66,6 +66,8 @@ export function parseSubmission(raw) {
     score: Number(payload.score) || 0,
     comment: String(payload.comment || ''),
     wish: String(payload.wish || ''),
+    // M3·FE-7「不公开项目名」：问卷后续版本会带此标记，旧提交没有则视为 false
+    projectHidden: Boolean(payload.projectHidden),
     profile: payload.profile || {},
     flags: Array.isArray(raw.meta?.flags) ? raw.meta.flags : [],
     meta: raw.meta || {},
@@ -79,7 +81,9 @@ function taxonomyKeys(taxonomy, name) {
 export function validateDraft(draft, { taxonomy, company } = {}) {
   const errors = [];
   if (!COMPANY_ID.test(draft.companyId || '')) errors.push('公司 ID 必须形如 c_xxx');
-  if (draft.projectId && !PROJECT_ID.test(draft.projectId)) errors.push('项目 ID 必须形如 p_xxx');
+  if (draft.projectAnonymous) {
+    if (draft.projectId) errors.push('匿名项目评价不能同时关联具体项目');
+  } else if (draft.projectId && !PROJECT_ID.test(draft.projectId)) errors.push('项目 ID 必须形如 p_xxx');
   if (draft.projectId && company && !company.projects.some(project => project.id === draft.projectId)) {
     errors.push('项目不属于当前公司');
   }
@@ -122,7 +126,8 @@ export function buildReview(draft) {
     schemaVersion: 1,
     id: draft.id,
     companyId: draft.companyId,
-    ...(draft.projectId ? { projectId: draft.projectId } : {}),
+    ...(draft.projectAnonymous ? { projectAnonymous: true } : {}),
+    ...(!draft.projectAnonymous && draft.projectId ? { projectId: draft.projectId } : {}),
     score: draft.score,
     ...(draft.title ? { title: draft.title } : {}),
     comment: draft.comment,

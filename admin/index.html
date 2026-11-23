@@ -54,12 +54,20 @@
             <div id="submission-summary" class="summary"></div>
 
             <div class="grid">
-              <label>公司
-                <select id="company-select"></select>
-              </label>
-              <label>项目
-                <select id="project-select"></select>
-              </label>
+              <div class="field">
+                <span class="field-title">公司</span>
+                <div class="combo">
+                  <input id="company-input" type="search" placeholder="搜索公司：名称 / ID / 别名 / 项目" autocomplete="off" spellcheck="false">
+                  <div id="company-list" class="combo-list" hidden></div>
+                </div>
+              </div>
+              <div class="field">
+                <span class="field-title">项目</span>
+                <div class="combo">
+                  <input id="project-input" type="search" placeholder="搜索项目：名称 / ID / 别名" autocomplete="off" spellcheck="false">
+                  <div id="project-list" class="combo-list" hidden></div>
+                </div>
+              </div>
             </div>
 
             <div id="new-company" class="subpanel" hidden>
@@ -98,22 +106,30 @@
               <label>标题（选填） <input id="review-title" maxlength="40" autocomplete="off"></label>
             </div>
 
+            <label>在职时长（选填，四区间）
+              <select id="profile-tenure"></select>
+            </label>
+
             <label>评价正文
               <textarea id="review-comment" rows="8" maxlength="2000"></textarea>
             </label>
+            <div id="comment-preview" class="preview" hidden></div>
+            <p id="sensitive-status" class="status" role="status"></p>
 
             <fieldset>
               <legend>标签</legend>
               <div id="tag-list" class="checks"></div>
             </fieldset>
 
+            <div id="similar-box" class="similar" hidden></div>
+
             <fieldset>
-              <legend>画像</legend>
-              <div class="grid">
-                <label>岗位 <select id="profile-role"></select></label>
-                <label>司龄 <select id="profile-tenure"></select></label>
-                <label>状态 <select id="profile-employment"></select></label>
-                <label>城市 <select id="profile-city"></select></label>
+              <legend>发布前检查（全部勾选才能通过或暂存）</legend>
+              <div id="checklist" class="checks vertical">
+                <label><input type="checkbox" class="check-item" value="pii"> 不含真实姓名、联系方式、身份证号、住址</label>
+                <label><input type="checkbox" class="check-item" value="secret"> 不含未公开的项目代号、内部系统名或商业秘密</label>
+                <label><input type="checkbox" class="check-item" value="attack"> 不含人身攻击、侮辱性表述</label>
+                <label><input type="checkbox" class="check-item" value="attribution"> 公司与项目归属正确，正文与所选对象一致</label>
               </div>
             </fieldset>
 
@@ -122,6 +138,20 @@
               <button id="stage-button" type="button" class="ghost">暂存</button>
               <button id="reject-button" type="button" class="danger">拒绝</button>
             </div>
+
+            <div id="reject-panel" class="subpanel" hidden>
+              <label>拒绝原因（只进内部记录，不通知提交者）
+                <select id="reject-reason"></select>
+              </label>
+              <label id="reject-note-row" hidden>补充说明（选「其他」时必填）
+                <input id="reject-note" maxlength="100" autocomplete="off">
+              </label>
+              <div class="actions">
+                <button id="reject-confirm" type="button" class="danger">确认拒绝</button>
+                <button id="reject-cancel" type="button" class="ghost">取消</button>
+              </div>
+            </div>
+
             <p id="detail-status" class="status" role="status"></p>
           </form>
         </section>

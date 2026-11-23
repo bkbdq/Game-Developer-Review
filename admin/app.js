@@ -1,6 +1,11 @@
 import { createClient } from './lib/github.js';
 import { createApi } from './lib/api.js';
 import { config } from './config.js';
+import { h } from './lib/dom.js';
+import { bestKeyScore, buildAliasIndex, normalize, AUTO_MATCH_THRESHOLD } from './lib/match.js';
+import { createCombobox } from './lib/combo.js';
+import { scanDraft, highlightRanges } from './lib/sensitive.js';
+import { findSimilar } from './lib/similar.js';
 import {
   parseSubmission,
   parseJson,
@@ -17,6 +22,13 @@ import { publishReview, publishReviews } from './lib/publish.js';
 
 const TOKEN_KEY = 'gdr.admin.token';
 const STAGING_KEY = 'gdr.admin.staging';
+
+// M4·FE-4：拒绝原因下拉（内部记录，不通知提交者）
+const REJECT_REASONS = ['含个人信息', '疑似不实', '广告引流', '与公司无关', '重复提交', '涉及商业秘密', '其他'];
+// M4·FE-1：发布前检查清单条数
+const CHECKLIST_COUNT = 4;
+// M4·FE-3：相似内容提示阈值
+const SIMILAR_THRESHOLD = 0.75;
 
 const $ = selector => document.querySelector(selector);
 const loginView = $('#login-view');
@@ -37,12 +49,21 @@ const tabStaged = $('#tab-staged');
 const stagedBar = $('#staged-bar');
 const stagedSummary = $('#staged-summary');
 const publishBatchButton = $('#publish-batch-button');
-const stageButton = $('#stage-button');
 const detailEmpty = $('#detail-empty');
 const reviewForm = $('#review-form');
 const summaryEl = $('#submission-summary');
-const companySelect = $('#company-select');
-const projectSelect = $('#project-select');
+const companyCombo = createCombobox({
+  input: $('#company-input'),
+  list: $('#company-list'),
+  onSelect: handleCompanySelect,
+  onBlur: handleCompanyBlur,
+});
+const projectCombo = createCombobox({
+  input: $('#project-input'),
+  list: $('#project-list'),
+  onSelect: handleProjectSelect,
+  onBlur: handleProjectBlur,
+});
 const newCompanyBox = $('#new-company');
 const newCompanyId = $('#new-company-id');
 const newCompanySlug = $('#new-company-slug');
@@ -54,13 +75,21 @@ const newProjectStatus = $('#new-project-status');
 const scoreSelect = $('#review-score');
 const titleInput = $('#review-title');
 const commentInput = $('#review-comment');
+const commentPreview = $('#comment-preview');
+const sensitiveStatus = $('#sensitive-status');
+const similarBox = $('#similar-box');
 const tagList = $('#tag-list');
-const roleSelect = $('#profile-role');
 const tenureSelect = $('#profile-tenure');
-const employmentSelect = $('#profile-employment');
-const citySelect = $('#profile-city');
+const checklist = $('#checklist');
 const approveButton = $('#approve-button');
+const stageButton = $('#stage-button');
 const rejectButton = $('#reject-button');
+const rejectPanel = $('#reject-panel');
+const rejectReason = $('#reject-reason');
+const rejectNoteRow = $('#reject-note-row');
+const rejectNote = $('#reject-note');
+const rejectConfirmButton = $('#reject-confirm');
+const rejectCancelButton = $('#reject-cancel');
 const detailStatus = $('#detail-status');
 const globalStatus = $('#global-status');
 
@@ -69,6 +98,8 @@ const state = {
   api: null,
   taxonomy: null,
   companies: new Map(),
+  library: { companies: [], projects: [] },
+  aliasIndex: new Map(),
   pending: [],
   pendingTotal: 0,
   staging: loadStaging(),
@@ -77,23 +108,12 @@ const state = {
   selectedId: null,
   reviewId: null,
   busy: false,
+  sensitive: { hits: [], hasHard: false, hasSoft: false },
+  checked: new Set(),
+  reviewPaths: new Map(),
+  publishedReviews: new Map(),
+  similarToken: 0,
 };
-
-function h(tag, attrs = {}, ...children) {
-  const element = document.createElement(tag);
-  Object.entries(attrs).forEach(([key, value]) => {
-    if (key === 'class') element.className = value;
-    else if (key === 'dataset') Object.assign(element.dataset, value);
-    else if (key.startsWith('on')) element.addEventListener(key.slice(2).toLowerCase(), value);
-    else if (key in element) element[key] = value;
-    else element.setAttribute(key, value);
-  });
-  children.flat().forEach(child => {
-    if (child === null || child === undefined || child === false) return;
-    element.append(child.nodeType ? child : document.createTextNode(String(child)));
-  });
-  return element;
-}
 
 function setStatus(element, message, isError = false) {
   element.textContent = message || '';
@@ -126,12 +146,13 @@ function fillSelect(select, entries, emptyLabel = '不填') {
 
 function renderTaxonomyOptions() {
   const taxonomy = state.taxonomy;
-  fillSelect(roleSelect, taxonomy.roles);
   fillSelect(tenureSelect, taxonomy.tenures);
-  fillSelect(employmentSelect, taxonomy.employments);
-  fillSelect(citySelect, taxonomy.cities);
   tagList.replaceChildren(...taxonomy.tags.map(tag =>
     h('label', {}, h('input', { type: 'checkbox', value: tag.key }), tag.label)));
+  rejectReason.replaceChildren(
+    h('option', { value: '' }, '选择原因…'),
+    ...REJECT_REASONS.map(reason => h('option', { value: reason }, reason)),
+  );
 }
 
 function loadStaging() {
@@ -227,11 +248,11 @@ function unstageItem(submissionId) {
 }
 
 function toggleNewCompany() {
-  newCompanyBox.hidden = companySelect.value !== '__new';
+  newCompanyBox.hidden = companyCombo.value !== '__new';
 }
 
 function toggleNewProject() {
-  newProjectBox.hidden = projectSelect.value !== '__new';
+  newProjectBox.hidden = projectCombo.value !== '__new';
 }
 
 function syncCompanyFields() {
@@ -249,7 +270,7 @@ function matchCompanyByName() {
   const matched = name ? findCompany(name) : null;
   if (!matched) return false;
   const pendingProject = newProjectName.value.trim();
-  companySelect.value = matched.id;
+  companyCombo.setValue(matched.id);
   toggleNewCompany();
   renderProjectOptions(matched, pendingProject);
   setStatus(detailStatus, `已匹配现有公司「${matched.name}」，无需新建`);
@@ -264,33 +285,212 @@ function syncProjectId() {
 
 function matchProjectByName() {
   const name = newProjectName.value.trim();
-  const company = companySelect.value === '__new' ? null : state.companies.get(companySelect.value);
+  const company = companyCombo.value === '__new' ? null : state.companies.get(companyCombo.value);
   if (!name || !company) return false;
   const target = name.toLowerCase();
   const matched = company.projects.find(project => project.name.toLowerCase() === target);
   if (!matched) return false;
-  projectSelect.value = matched.id;
+  projectCombo.setValue(matched.id);
   toggleNewProject();
   setStatus(detailStatus, `已匹配现有项目「${matched.name}」，无需新建`);
   return true;
 }
 
-function renderProjectOptions(company, projectName) {
-  projectSelect.replaceChildren(h('option', { value: '__none' }, '不关联项目'));
-  (company?.projects || []).forEach(project => {
-    projectSelect.append(h('option', { value: project.id }, `${project.name}（${project.id}）`));
-  });
-  projectSelect.append(h('option', { value: '__new' }, '＋ 新建项目'));
+/**
+ * 一个公司的全部检索键：名称 / ID / slug / 自带别名 / 别名库补充别名，
+ * 以及项目名与项目别名（命中项目时顺带把公司带出来）。
+ */
+function companyKeys(company) {
+  const idx = state.aliasIndex.get(company.id);
+  const keys = [
+    { k: company.name },
+    { k: company.id },
+    ...(company.slug ? [{ k: company.slug }] : []),
+    ...(company.aliases || []).map(k => ({ k })),
+    ...(idx?.aliases || []).map(k => ({ k })),
+  ];
+  for (const project of company.projects || []) {
+    keys.push({ k: project.name, project: project.id, pn: project.name });
+    for (const alias of idx?.projects.get(project.id) || []) {
+      keys.push({ k: alias, project: project.id, pn: project.name });
+    }
+  }
+  for (const extra of idx?.extra || []) {
+    keys.push({ k: extra.name, project: null, pn: extra.name });
+    for (const alias of extra.aliases) keys.push({ k: alias, project: null, pn: extra.name });
+  }
+  return keys;
+}
 
-  const target = String(projectName || '').trim().toLowerCase();
-  const matched = target ? company?.projects.find(project => project.name.toLowerCase() === target) : null;
-  projectSelect.value = matched ? matched.id : (projectName ? '__new' : '__none');
+/** 在全部公司里模糊查找，threshold 提高可只接受精确 / 前缀命中。 */
+function matchCompany(text, threshold = AUTO_MATCH_THRESHOLD) {
+  if (!text) return null;
+  let best = null;
+  for (const company of state.companies.values()) {
+    const { score, key } = bestKeyScore(text, companyKeys(company));
+    if (score >= threshold && (!best || score > best.score)) best = { company, score, key };
+  }
+  return best;
+}
 
-  newProjectName.value = projectSelect.value === '__new' ? projectName : '';
+/**
+ * 在指定公司下模糊匹配项目，返回 { project, hint }。
+ * hint 用于别名命中与「公司下还没建这个项目」的提示。
+ */
+function matchProject(company, text, threshold = AUTO_MATCH_THRESHOLD) {
+  if (!company || !text) return { project: null, hint: '' };
+  const idx = state.aliasIndex.get(company.id);
+  let best = null;
+  for (const project of company.projects || []) {
+    const keys = [
+      { k: project.name },
+      { k: project.id },
+      ...(idx?.projects.get(project.id) || []).map(k => ({ k })),
+    ];
+    const { score, key } = bestKeyScore(text, keys);
+    if (score >= threshold && (!best || score > best.score)) best = { project, key };
+  }
+  if (best) {
+    const keyText = best.key?.k ? normalize(best.key.k) : '';
+    const viaAlias = keyText && keyText !== normalize(best.project.name) && keyText !== normalize(best.project.id);
+    return {
+      project: best.project,
+      hint: viaAlias ? `已按别名「${best.key.k}」匹配项目「${best.project.name}」` : '',
+    };
+  }
+  for (const extra of idx?.extra || []) {
+    const { score, key } = bestKeyScore(text, [{ k: extra.name }, ...extra.aliases.map(k => ({ k }))]);
+    if (score >= threshold) {
+      return {
+        project: null,
+        hint: `「${text}」接近已知项目「${extra.name}」（命中「${key?.k}」），当前公司还没有该项目`,
+      };
+    }
+  }
+  return { project: null, hint: '' };
+}
+
+function renderProjectOptions(company, projectText, { anon = false } = {}) {
+  const idx = state.aliasIndex.get(company?.id);
+  projectCombo.setOptions([
+    { value: '__none', label: '不关联项目' },
+    ...(company?.projects || []).map(project => ({
+      value: project.id,
+      label: project.name,
+      sub: project.id,
+      keys: [
+        { k: project.name },
+        { k: project.id },
+        ...(idx?.projects.get(project.id) || []).map(k => ({ k })),
+      ],
+    })),
+    { value: '__anon', label: '匿名项目', sub: '不公开项目名，公司页归入匿名项目' },
+    { value: '__new', label: '＋ 新建项目' },
+  ]);
+
+  // M4·FE-5：用户勾了「不公开项目名」或审核员判断不宜公开 → 归入匿名项目
+  if (anon) {
+    projectCombo.setValue('__anon');
+    newProjectName.value = '';
+    newProjectId.dataset.touched = '';
+    newProjectId.value = '';
+    newProjectStatus.value = 'unknown';
+    toggleNewProject();
+    return '';
+  }
+
+  const { project: matched, hint } = matchProject(company, projectText);
+  const value = matched ? matched.id : (projectText ? '__new' : '__none');
+  projectCombo.setValue(value, matched ? matched.name : projectText);
+  newProjectName.value = value === '__new' ? projectText : '';
   newProjectId.dataset.touched = '';
   newProjectId.value = newProjectName.value.trim() ? `p_${autoSlug(newProjectName.value)}` : '';
   newProjectStatus.value = 'unknown';
   toggleNewProject();
+  return hint;
+}
+
+function handleCompanySelect(value, { query = '', projectName = '' } = {}) {
+  if (value === '__new') {
+    const text = query.trim();
+    if (text) newCompanyName.value = text;
+    newCompanySlug.dataset.touched = '';
+    newCompanyId.dataset.touched = '';
+    syncCompanyFields();
+    toggleNewCompany();
+    if (matchCompanyByName()) return;
+    renderProjectOptions(null, '');
+    return;
+  }
+  toggleNewCompany();
+  renderProjectOptions(state.companies.get(value) || null, projectName);
+}
+
+function handleCompanyBlur(text) {
+  const value = companyCombo.value;
+  const query = text.trim();
+  if (value !== '__new' && query === companyCombo.labelOf(value)) return;
+  if (!query) {
+    companyCombo.setValue(value);
+    return;
+  }
+  if (value === '__new' && query === newCompanyName.value.trim()) return;
+
+  // 搜了但没点：命中足够可信就自动选中，否则按新建公司处理
+  const matched = matchCompany(query, 90);
+  if (matched) {
+    companyCombo.setValue(matched.company.id);
+    toggleNewCompany();
+    renderProjectOptions(matched.company, '');
+    setStatus(detailStatus, `已选择公司「${matched.company.name}」`);
+    return;
+  }
+  companyCombo.setValue('__new', query);
+  newCompanyName.value = query;
+  newCompanySlug.dataset.touched = '';
+  newCompanyId.dataset.touched = '';
+  syncCompanyFields();
+  toggleNewCompany();
+  if (!matchCompanyByName()) renderProjectOptions(null, '');
+}
+
+function handleProjectSelect(value, { query = '' } = {}) {
+  if (value === '__new') {
+    const text = query.trim();
+    if (text) newProjectName.value = text;
+    newProjectId.dataset.touched = '';
+    syncProjectId();
+    toggleNewProject();
+    matchProjectByName();
+    return;
+  }
+  toggleNewProject();
+}
+
+function handleProjectBlur(text) {
+  const value = projectCombo.value;
+  const query = text.trim();
+  if (value !== '__new' && query === projectCombo.labelOf(value)) return;
+  if (!query) {
+    projectCombo.setValue(value);
+    return;
+  }
+  if (value === '__new' && query === newProjectName.value.trim()) return;
+
+  const company = state.companies.get(companyCombo.value);
+  const { project: matched } = matchProject(company, query, 90);
+  if (matched) {
+    projectCombo.setValue(matched.id);
+    toggleNewProject();
+    setStatus(detailStatus, `已选择项目「${matched.name}」`);
+    return;
+  }
+  projectCombo.setValue('__new', query);
+  newProjectName.value = query;
+  newProjectId.dataset.touched = '';
+  syncProjectId();
+  toggleNewProject();
+  matchProjectByName();
 }
 
 function renderDetail(item) {
@@ -310,15 +510,25 @@ function renderDetail(item) {
     `正文：${view.comment}`,
   ].filter(Boolean).join('\n');
 
-  const companies = [...state.companies.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
-  companySelect.replaceChildren(
-    ...companies.map(company => h('option', { value: company.id }, `${company.name}（${company.id}）`)),
-    h('option', { value: '__new' }, '＋ 新建公司'),
-  );
+  companyCombo.setOptions([...state.companies.values()]
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+    .map(company => ({ value: company.id, label: company.name, sub: company.id, keys: companyKeys(company) })));
 
-  const hinted = view.companyId ? state.companies.get(view.companyId) : null;
-  const matched = hinted || findCompany(view.company);
-  companySelect.value = matched ? matched.id : '__new';
+  const notes = [];
+  let matched = view.companyId ? state.companies.get(view.companyId) : null;
+  if (matched) {
+    notes.push(`已按提交的公司 ID 匹配「${matched.name}」`);
+  } else {
+    const found = matchCompany(view.company);
+    if (found) {
+      matched = found.company;
+      const via = found.key?.k && normalize(found.key.k) !== normalize(found.company.name)
+        ? `（命中「${found.key.k}」）`
+        : '';
+      notes.push(`已匹配现有公司「${found.company.name}」${via}`);
+    }
+  }
+  companyCombo.setValue(matched ? matched.id : '__new', matched ? matched.name : view.company);
   toggleNewCompany();
 
   newCompanyName.value = view.company || '';
@@ -327,17 +537,21 @@ function renderDetail(item) {
   newCompanyId.dataset.touched = '';
   newCompanyId.value = newCompanySlug.value ? `c_${newCompanySlug.value}` : 'c_';
 
-  renderProjectOptions(matched, view.project);
+  const projectHint = renderProjectOptions(matched, view.project, { anon: view.projectHidden });
+  if (projectHint) notes.push(projectHint);
+  setStatus(detailStatus, notes.join('；'));
   scoreSelect.value = String(view.score || 3);
   titleInput.value = '';
   commentInput.value = view.comment || '';
 
-  roleSelect.value = view.profile?.role || '';
   tenureSelect.value = view.profile?.tenure || '';
-  employmentSelect.value = view.profile?.employment || '';
-  citySelect.value = view.profile?.city || '';
-
   tagList.querySelectorAll('input').forEach(input => { input.checked = false; });
+
+  resetChecklist();
+  clearReviewArtifacts();
+  refreshSensitive();
+  refreshGate();
+  loadPublishedReviews(matched ? matched.id : null);
 }
 
 function showEmptyDetail() {
@@ -346,7 +560,9 @@ function showEmptyDetail() {
   state.selected = null;
   state.selectedId = null;
   state.reviewId = null;
+  clearReviewArtifacts();
   renderList();
+  refreshGate();
 }
 
 function selectItem(item) {
@@ -358,11 +574,9 @@ function selectItem(item) {
 }
 
 function collectProfile() {
+  // M4·FE-6 / 需求决策 4、5：画像只保留在职时长四区间
   const profile = {};
-  if (roleSelect.value) profile.role = roleSelect.value;
   if (tenureSelect.value) profile.tenure = tenureSelect.value;
-  if (employmentSelect.value) profile.employment = employmentSelect.value;
-  if (citySelect.value) profile.city = citySelect.value;
   return profile;
 }
 
@@ -370,13 +584,153 @@ function collectTags() {
   return [...tagList.querySelectorAll('input:checked')].map(input => input.value);
 }
 
+// ── 发布前门禁（M4·FE-1 检查清单 + FE-2 敏感信息） ──────────────────────
+function gateBlocked() {
+  return state.checked.size < CHECKLIST_COUNT || state.sensitive.hasHard;
+}
+
+function refreshGate() {
+  const blocked = state.busy || !state.selected || gateBlocked();
+  approveButton.disabled = blocked;
+  stageButton.disabled = blocked;
+  approveButton.textContent = state.busy ? '处理中…' : '通过并发布';
+}
+
 function setBusy(busy) {
   state.busy = busy;
-  approveButton.disabled = busy;
-  stageButton.disabled = busy;
   rejectButton.disabled = busy;
   publishBatchButton.disabled = busy || !state.staging.length;
-  approveButton.textContent = busy ? '处理中…' : '通过并发布';
+  refreshGate();
+}
+
+function clip(text, max = 24) {
+  const source = String(text || '').replace(/\s+/g, ' ').trim();
+  return source.length > max ? `${source.slice(0, max)}…` : source;
+}
+
+function resetChecklist() {
+  checklist.querySelectorAll('input.check-item').forEach(input => { input.checked = false; });
+  state.checked = new Set();
+}
+
+/** 正文预览：命中敏感片段标红（硬）/标黄（软），M4·FE-2 */
+function renderCommentPreview() {
+  const text = commentInput.value;
+  commentPreview.hidden = !text;
+  if (!text) {
+    commentPreview.replaceChildren();
+    return;
+  }
+  commentPreview.replaceChildren();
+  let cursor = 0;
+  for (const range of highlightRanges(state.sensitive.hits, text.length)) {
+    if (range.start > cursor) commentPreview.append(text.slice(cursor, range.start));
+    commentPreview.append(h('mark',
+      { class: range.level === 'hard' ? 'hit-hard' : 'hit-soft' },
+      text.slice(range.start, range.end)));
+    cursor = range.end;
+  }
+  if (cursor < text.length) commentPreview.append(text.slice(cursor));
+}
+
+function refreshSensitive() {
+  state.sensitive = scanDraft({ comment: commentInput.value, title: titleInput.value });
+  renderCommentPreview();
+  const hard = state.sensitive.hits.filter(hit => hit.level === 'hard');
+  const soft = state.sensitive.hits.filter(hit => hit.level === 'soft');
+  const parts = [];
+  if (hard.length) parts.push(`禁止发布：${hard.map(hit => `${hit.field}有${hit.type}「${clip(hit.fragment)}」`).join('、')}`);
+  if (soft.length) parts.push(`提醒：${soft.map(hit => `${hit.field}疑似${hit.type}「${clip(hit.fragment)}」`)}`);
+  setStatus(sensitiveStatus, parts.join('；') || '');
+  sensitiveStatus.classList.toggle('blocked', Boolean(hard.length));
+  sensitiveStatus.classList.toggle('warn', !hard.length && Boolean(soft.length));
+  refreshGate();
+}
+
+/** 当前公司的相似度候选：已发布评价（GitHub 加载）+ 本地暂存中同公司的条目 */
+function similarCandidates(companyId) {
+  const published = (state.publishedReviews.get(companyId) || [])
+    .map(review => ({ id: review.id, text: review.comment, tag: '已发布' }));
+  const staged = state.staging
+    .filter(entry => entry.company.id === companyId)
+    .map(entry => ({ id: entry.review.id, text: entry.review.comment, tag: '暂存' }));
+  return [...published, ...staged];
+}
+
+function renderSimilarNow() {
+  const companyId = state.companies.has(companyCombo.value) ? companyCombo.value : null;
+  const known = companyId && (state.publishedReviews.has(companyId) || !state.reviewPaths.get(companyId)?.length);
+  if (!companyId || !known || !state.reviewPaths.get(companyId)?.length) {
+    similarBox.hidden = true;
+    similarBox.replaceChildren();
+    return;
+  }
+  const hits = findSimilar(commentInput.value, similarCandidates(companyId), { threshold: SIMILAR_THRESHOLD });
+  if (!hits.length) {
+    similarBox.hidden = true;
+    similarBox.replaceChildren();
+    return;
+  }
+  similarBox.hidden = false;
+  similarBox.replaceChildren(
+    h('div', { class: 'similar-title' }, '⚠ 可能与已有评价重复（可继续发布，请人工确认）'),
+    h('ul', {}, ...hits.map(({ item, score }) => h('li', {},
+      `${item.tag} ${item.id} · 相似度 ${Math.round(score * 100)}% · 「${clip(item.text, 40)}」`))),
+  );
+}
+
+/** 拉取同公司已发布评价正文用于相似度对比，结果按公司缓存 */
+async function loadPublishedReviews(companyId) {
+  const token = ++state.similarToken;
+  if (!companyId || !state.reviewPaths.get(companyId)?.length) {
+    renderSimilarNow();
+    return;
+  }
+  try {
+    if (!state.publishedReviews.has(companyId)) {
+      const files = await Promise.all(state.reviewPaths.get(companyId).map(async path => {
+        const file = await state.client.getFile(config.owner, config.publicRepo, path, config.publicBranch);
+        return file ? parseJson(file.content, path) : null;
+      }));
+      state.publishedReviews.set(companyId, files.filter(Boolean)
+        .map(review => ({ id: review.id, comment: review.comment || '', title: review.title || '' })));
+    }
+  } catch {
+    // 相似度对比失败不阻塞审核
+  }
+  if (token === state.similarToken) renderSimilarNow();
+}
+
+function resetRejectPanel() {
+  rejectPanel.hidden = true;
+  rejectReason.value = '';
+  rejectNote.value = '';
+  rejectNoteRow.hidden = true;
+}
+
+function clearReviewArtifacts() {
+  state.checked = new Set();
+  state.sensitive = { hits: [], hasHard: false, hasSoft: false };
+  state.similarToken += 1;
+  commentPreview.hidden = true;
+  commentPreview.replaceChildren();
+  setStatus(sensitiveStatus, '');
+  sensitiveStatus.classList.remove('blocked', 'warn');
+  similarBox.hidden = true;
+  similarBox.replaceChildren();
+  resetRejectPanel();
+}
+
+async function loadAliases() {
+  try {
+    const response = await fetch('/lib/aliases.json');
+    if (!response.ok) return;
+    const data = await response.json();
+    if (Array.isArray(data?.companies)) state.library.companies = data.companies;
+    if (Array.isArray(data?.projects)) state.library.projects = data.projects;
+  } catch {
+    // 别名库缺失或损坏时退回纯名称匹配，不阻塞审核
+  }
 }
 
 async function loadData() {
@@ -387,6 +741,7 @@ async function loadData() {
     client.getFile(config.owner, config.publicRepo, config.taxonomyPath, config.publicBranch),
     client.getTree(config.owner, config.publicRepo, config.publicBranch),
     api.listPending(config.maxPending),
+    loadAliases(),
   ]);
   if (!taxonomyFile) throw new Error('公开仓缺少 taxonomy.json');
 
@@ -401,6 +756,19 @@ async function loadData() {
     return file ? parseJson(file.content, path) : null;
   }));
   state.companies = new Map(companyFiles.filter(Boolean).map(company => [company.id, company]));
+  state.aliasIndex = buildAliasIndex(state.companies, state.library);
+
+  // 记录每家公司已发布评价的文件路径，供相似度对比（M4·FE-3）按需拉取
+  const reviewPaths = new Map();
+  (companyTree.tree || []).forEach(item => {
+    if (item.type !== 'blob' || !item.path.startsWith(`${config.reviewsDir}/`) || !item.path.endsWith('.json')) return;
+    const companyId = item.path.split('/')[2];
+    if (!companyId) return;
+    if (!reviewPaths.has(companyId)) reviewPaths.set(companyId, []);
+    reviewPaths.get(companyId).push(item.path);
+  });
+  state.reviewPaths = reviewPaths;
+  state.publishedReviews = new Map();
 
   state.pending = (pendingResult.items || [])
     .map(item => {
@@ -450,6 +818,7 @@ function signOut(message = '') {
   state.pending = [];
   state.pendingTotal = 0;
   state.companies = new Map();
+  state.aliasIndex = new Map();
   state.selected = null;
   state.selectedId = null;
   state.reviewId = null;
@@ -466,9 +835,10 @@ function signOut(message = '') {
 }
 
 function collectDraft() {
-  const projectChoice = projectSelect.value;
+  const projectChoice = projectCombo.value;
   let newProject = null;
   let projectId = '';
+  let projectAnonymous = false;
   if (projectChoice === '__new') {
     newProject = {
       id: newProjectId.value.trim(),
@@ -476,12 +846,15 @@ function collectDraft() {
       status: newProjectStatus.value,
     };
     projectId = newProject.id;
+  } else if (projectChoice === '__anon') {
+    // M4·FE-5：匿名项目，不关联具体项目
+    projectAnonymous = true;
   } else if (projectChoice !== '__none') {
     projectId = projectChoice;
   }
 
   let company;
-  if (companySelect.value === '__new') {
+  if (companyCombo.value === '__new') {
     const companyId = newCompanyId.value.trim();
     if (state.companies.has(companyId)) throw new Error('公司 ID 已存在，请直接选择现有公司');
     company = buildCompany({
@@ -492,7 +865,7 @@ function collectDraft() {
       date: today(),
     });
   } else {
-    const base = state.companies.get(companySelect.value);
+    const base = state.companies.get(companyCombo.value);
     if (!base) throw new Error('未找到公司');
     if (newProject && base.projects.some(project => project.id === newProject.id)) {
       throw new Error('项目 ID 已存在，请直接选择现有项目');
@@ -504,6 +877,7 @@ function collectDraft() {
     id: state.reviewId,
     companyId: company.id,
     projectId,
+    projectAnonymous,
     score: Number(scoreSelect.value),
     title: titleInput.value.trim(),
     comment: commentInput.value.trim(),
@@ -523,6 +897,10 @@ function collectDraft() {
 
 function handleStage() {
   if (state.busy || !state.selected) return;
+  if (gateBlocked()) {
+    setStatus(detailStatus, '请先完成发布前检查清单；正文含敏感信息时需脱敏后再暂存', true);
+    return;
+  }
   const item = state.selected;
   try {
     const { review, company } = collectDraft();
@@ -604,6 +982,10 @@ async function publishStaged() {
 async function handleApprove(event) {
   event.preventDefault();
   if (state.busy || !state.selected) return;
+  if (gateBlocked()) {
+    setStatus(detailStatus, '请先完成发布前检查清单；正文含敏感信息时需脱敏后再发布', true);
+    return;
+  }
 
   const item = state.selected;
   setBusy(true);
@@ -639,22 +1021,34 @@ async function handleApprove(event) {
   }
 }
 
-async function handleReject() {
+function handleReject() {
+  if (state.busy || !state.selected) return;
+  rejectPanel.hidden = !rejectPanel.hidden;
+  if (!rejectPanel.hidden) rejectReason.focus();
+}
+
+async function handleRejectConfirm() {
   if (state.busy || !state.selected) return;
   const item = state.selected;
-  const reason = window.prompt('填写拒绝原因（会写入审计日志）');
-  if (reason === null) return;
-  if (!reason.trim()) {
-    setStatus(detailStatus, '拒绝原因不能为空', true);
+  const reason = rejectReason.value;
+  if (!reason) {
+    setStatus(detailStatus, '请选择拒绝原因', true);
     return;
   }
+  const note = rejectNote.value.trim();
+  if (reason === '其他' && !note) {
+    setStatus(detailStatus, '选「其他」时必须填写补充说明', true);
+    return;
+  }
+  const finalReason = reason === '其他' ? `其他：${note}` : reason;
 
   setBusy(true);
   setStatus(detailStatus, '正在拒绝…');
   try {
-    await state.api.reject(item.id, { reason: reason.trim() });
+    await state.api.reject(item.id, { reason: finalReason });
     state.pending = state.pending.filter(entry => entry.id !== item.id);
     state.pendingTotal = Math.max(0, state.pendingTotal - 1);
+    resetRejectPanel();
     showEmptyDetail();
     setStatus(globalStatus, `已拒绝 ${item.raw.submissionId}`);
   } catch (error) {
@@ -711,13 +1105,21 @@ tabPending.addEventListener('click', () => setTab('pending'));
 tabStaged.addEventListener('click', () => setTab('staged'));
 stageButton.addEventListener('click', handleStage);
 publishBatchButton.addEventListener('click', publishStaged);
-companySelect.addEventListener('change', () => {
-  toggleNewCompany();
-  renderProjectOptions(state.companies.get(companySelect.value) || null, '');
-});
-projectSelect.addEventListener('change', toggleNewProject);
 reviewForm.addEventListener('submit', handleApprove);
 rejectButton.addEventListener('click', handleReject);
+rejectConfirmButton.addEventListener('click', handleRejectConfirm);
+rejectCancelButton.addEventListener('click', resetRejectPanel);
+rejectReason.addEventListener('change', () => { rejectNoteRow.hidden = rejectReason.value !== '其他'; });
+
+checklist.addEventListener('change', () => {
+  state.checked = new Set([...checklist.querySelectorAll('input.check-item:checked')].map(input => input.value));
+  refreshGate();
+});
+commentInput.addEventListener('input', () => {
+  refreshSensitive();
+  renderSimilarNow();
+});
+titleInput.addEventListener('input', refreshSensitive);
 
 newCompanyName.addEventListener('input', () => {
   if (matchCompanyByName()) return;

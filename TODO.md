@@ -44,6 +44,13 @@
 - [x] `admin/` 静态 SPA 与管理员登录（PAT、sessionStorage、服务端权限校验）
 - [x] 控制台 Pages Functions API：登录校验、待审列表、通过、拒绝、审计
 - [x] 待审列表、详情、公司 / 项目匹配、脱敏编辑
+- [x] 公司 / 项目可搜索选择与模糊匹配（内置常见游戏公司 / 项目别名库 `admin/lib/aliases.json`，`npm run test:admin`）
+- [x] 发布前检查清单（四项必勾，未勾完不能通过或暂存，M4·FE-1）
+- [x] 敏感信息检查（手机号 / 邮箱 / 身份证标红禁发，微信 / QQ / 住址黄色提醒，M4·FE-2，`npm run test:admin-review`）
+- [x] 相似内容提示（与同公司已发布评价 + 暂存条目做字符二元组余弦对比，可继续发布，M4·FE-3）
+- [x] 拒绝原因下拉模板（七选一，「其他」必填说明，M4·FE-4）
+- [x] 匿名项目归类（`projectAnonymous: true`，不关联具体项目，M4·FE-5）
+- [x] 画像精简为在职时长四区间（决策 4 / 5，旧数据 role / city 保持兼容）
 - [x] 通过：Git Data API 单次原子提交到公开仓，并标记 D1 为 `approved`
 - [x] 拒绝：标记 D1 为 `rejected` 并记录原因
 - [x] 审计日志写入 D1 `audit_log`

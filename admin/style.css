@@ -160,6 +160,84 @@ button.danger { background: var(--danger); }
 .grid label { font-size: .88rem; color: var(--muted); }
 .grid label input, .grid label select { margin-top: .3rem; font-weight: 400; color: var(--ink); }
 
+.field { display: block; font-size: .88rem; color: var(--muted); font-weight: 600; }
+.field-title { display: block; }
+
+.combo { position: relative; margin-top: .3rem; font-weight: 400; color: var(--ink); }
+.combo input { margin: 0; }
+.combo-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 17rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+.combo-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: .4rem .65rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+.combo-item:hover, .combo-item.active { background: #eef7f1; }
+.combo-label { font-size: .92rem; color: var(--ink); }
+.combo-sub { font-size: .78rem; color: var(--muted); }
+.combo-empty { padding: .5rem .65rem; font-size: .85rem; color: var(--muted); }
+
+.preview {
+  margin-top: .4rem;
+  padding: .7rem .8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f8f5;
+  font-size: .9rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.preview:empty { display: none; }
+.preview mark { border-radius: 3px; padding: 0 2px; }
+.preview mark.hit-hard { background: #f6c6bd; color: #6b1d10; }
+.preview mark.hit-soft { background: #f6e6b8; color: #5f4708; }
+
+.similar {
+  margin-bottom: 1.1rem;
+  padding: .7rem .9rem;
+  border-left: 4px solid var(--warn);
+  border-radius: 8px;
+  background: #fdf6e3;
+  font-size: .88rem;
+}
+.similar .similar-title { font-weight: 600; margin-bottom: .3rem; }
+.similar ul { margin: 0; padding-left: 1.1rem; }
+.similar li { margin-bottom: .25rem; }
+.similar .similar-note { color: var(--muted); margin-top: .35rem; }
+
+.checks.vertical { flex-direction: column; gap: .45rem; }
+.checks.vertical label { display: flex; gap: .45rem; align-items: flex-start; font-weight: 400; color: var(--ink); }
+.checks.vertical input { width: auto; margin-top: .3rem; }
+
+.status.blocked { color: var(--danger); font-weight: 600; }
+.status.warn { color: var(--warn); }
+
+#reject-panel { margin-top: 1rem; }
+#reject-panel label { display: block; margin-bottom: .7rem; font-size: .88rem; color: var(--muted); font-weight: 600; }
+#reject-panel select, #reject-panel input { margin-top: .3rem; font-weight: 400; color: var(--ink); }
+
 .detail > form > label { margin-bottom: 1rem; font-size: .88rem; color: var(--muted); }
 .detail textarea { margin-top: .3rem; font-weight: 400; color: var(--ink); }
 
@@ -202,4 +280,5 @@ legend { padding: 0 .35rem; color: var(--muted); font-size: .85rem; }
   .summary { background: #23302a; }
   .list button.item.active { background: #233a2e; }
   .tab.active { background: #233a2e; }
+  .combo-item:hover, .combo-item.active { background: #233a2e; }
 }

@@ -9,6 +9,8 @@
     "data:build:dev": "node scripts/aggregate.mjs --test",
     "test:m2": "node scripts/test-m2.mjs",
     "test:m3": "node scripts/test-m3.mjs",
+    "test:admin": "node scripts/test-admin-match.mjs",
+    "test:admin-review": "node scripts/test-admin-review.mjs",
     "dev": "npm run data:build && npm run dev --workspace site",
     "build": "npm run data:validate && npm run data:build && npm run build --workspace site",
     "build:dev": "npm run data:validate && npm run data:build:dev && npm run build --workspace site",

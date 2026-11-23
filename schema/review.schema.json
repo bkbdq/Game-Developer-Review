@@ -10,6 +10,7 @@
     "id": { "type": "string", "pattern": "^rv_[A-Za-z0-9]+$" },
     "companyId": { "type": "string", "pattern": "^c_[a-z0-9_-]+$" },
     "projectId": { "type": "string", "pattern": "^p_[a-z0-9_-]+$" },
+    "projectAnonymous": { "type": "boolean", "const": true },
     "score": { "type": "integer", "minimum": 1, "maximum": 5 },
     "title": { "type": "string", "maxLength": 40 },
     "comment": { "type": "string", "minLength": 1, "maxLength": 2000 },

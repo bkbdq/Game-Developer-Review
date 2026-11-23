@@ -1,4 +1,4 @@
-const PRODUCTION_URL = 'https://bkbdq.github.io/Game-Developer-Review/data/v1/index.json';
+const PRODUCTION_URL = 'https://goodcorp.games/data/v1/index.json';
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300' };
 
 export async function onRequestGet() {

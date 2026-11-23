@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ADMIN_DIR = join(ROOT, 'admin');
 const DEPLOY_DIR = resolve(ROOT, '..', '.gdr-deploy');
-const API_ORIGIN = (process.env.ADMIN_API_ORIGIN || 'https://gdr-admin.pages.dev').replace(/\/$/, '');
+const API_ORIGIN = (process.env.ADMIN_API_ORIGIN || 'https://admin.goodcorp.games').replace(/\/$/, '');
 const HOST = '127.0.0.1';
 const BASE_PORT = Number(process.env.ADMIN_PORT || 8787);
 const WRANGLER = 'wrangler@4.165.0';
@@ -176,8 +176,8 @@ async function deploySite(req, res) {
       writeFileSync(stampPath, lockHash);
     }
 
-    console.log('[deploy] npm run build:dev');
-    const build = await run('npm', ['run', 'build:dev'], { env, cwd: DEPLOY_DIR });
+    console.log('[deploy] npm run build（正式站只读 data/）');
+    const build = await run('npm', ['run', 'build'], { env, cwd: DEPLOY_DIR });
     if (build.code !== 0) {
       console.error(build.output);
       return json(res, 500, { ok: false, message: '构建失败', log: build.output.slice(-4000) });
@@ -186,8 +186,8 @@ async function deploySite(req, res) {
     console.log('[deploy] wrangler pages deploy');
     const deployed = await run(
       'npx',
-      ['--yes', WRANGLER, 'pages', 'deploy', 'site/dist', '--project-name', 'gdr-site', '--branch', 'main', '--commit-dirty=true'],
-      { env, cwd: DEPLOY_DIR },
+      ['--yes', WRANGLER, 'pages', 'deploy', 'dist', '--project-name', 'gdr-site', '--branch', 'main', '--commit-dirty=true'],
+      { env, cwd: join(DEPLOY_DIR, 'site') },
     );
 
     if (deployed.code !== 0) {

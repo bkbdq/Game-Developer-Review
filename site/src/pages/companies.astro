@@ -19,9 +19,9 @@ const mostReviewed = sorted.reduce<(typeof sorted)[number] | undefined>((best,c)
 const bestRated = sorted.filter(c=>c.rating.rated).sort((a,b)=>b.mean-a.mean || b.reviewCount-a.reviewCount)[0];
 const awards = [
   { title: '评价最多', winner: mostReviewed, rule: '按累计评价篇数', empty: '暂无公开评价',
-    cover: mostReviewed?.titles[0]?.cover, metric: mostReviewed && mostReviewed.reviewCount+' 篇评价', detail: mostReviewed?.rating.grade },
+    cover: mostReviewed?.titles[0]?.thumb, metric: mostReviewed && mostReviewed.reviewCount+' 篇评价', detail: mostReviewed?.rating.grade },
   { title: '评价最好', winner: bestRated, rule: `至少 ${minimumRatingCount} 篇评价，按平均分`, empty: '暂无达标公司',
-    cover: (bestRated === mostReviewed && bestRated?.titles[1]?.cover) || bestRated?.titles[0]?.cover,
+    cover: (bestRated === mostReviewed && bestRated?.titles[1]?.thumb) || bestRated?.titles[0]?.thumb,
     metric: bestRated && scoreText(bestRated.avgScore)+' / 5', detail: bestRated && bestRated.reviewCount+' 篇评价' },
 ];
 ---
@@ -32,7 +32,7 @@ const awards = [
   </header>
   <section class="studio-awards" data-awards aria-label="公司榜首" hidden={!sorted.length}>
     {awards.map(({title,winner,rule,empty,cover,metric,detail})=><article class="studio-award">
-      {cover && <img src={cover} alt="" />}
+      {cover && <img src={cover} alt="" decoding="async" />}
       <div class="award-content"><h2>{winner && <span class="award-rank" lang="en">No.1</span>}{title}</h2><small>{rule}</small>
         {winner ? <><a class="award-winner" href={href('company/'+winner.slug+'/')}><Mark slug={winner.slug}/><strong>{winner.name}</strong><span aria-hidden="true">↗</span></a>
           <p><b>{metric}</b> · {detail}</p></> : <p>{empty} · <a class="award-empty-link" href={surveyUrl()}>写评价</a></p>}
@@ -46,7 +46,7 @@ const awards = [
     <div class="studio-grid" id="companies">
       {sorted.map(c=><a class="company-card studio-tile" href={href('company/' + c.slug + '/')}
         data-name={[c.name,c.slug,...c.aliases].join(' ').normalize('NFKC').toLocaleLowerCase()} data-count={c.reviewCount} data-updated={updatedOrder.get(c.id)}>
-        <div class="studio-tile-art">{c.titles[0]?.cover && <img loading="lazy" src={c.titles[0].cover} alt=""/>}
+        <div class="studio-tile-art">{c.titles[0]?.thumb && <img loading="lazy" decoding="async" src={c.titles[0].thumb} alt=""/>}
           <span class="studio-tile-score"><ReviewRating rating={c.rating}/></span>
         </div>
         <div class="studio-tile-body">
@@ -67,31 +67,42 @@ const awards = [
 <script>
   const grid = document.querySelector<HTMLElement>('#companies')!;
   const cards = Array.from(grid.querySelectorAll<HTMLAnchorElement>('.company-card'));
+  const initialOrder = [...cards];
   const search = document.querySelector<HTMLInputElement>('#query')!;
   const sort = document.querySelector<HTMLSelectElement>('#sort')!;
   const clearQuery = document.querySelector<HTMLButtonElement>('#clear-query')!;
-  function refresh() {
+  const countLabel = document.querySelector<HTMLElement>('[data-count-label]')!;
+  const listTitle = document.querySelector<HTMLElement>('[data-list-title]')!;
+  const awards = document.querySelector<HTMLElement>('[data-awards]')!;
+  const noResults = document.querySelector<HTMLElement>('#no-results')!;
+  const results = document.querySelector<HTMLElement>('#results')!;
+
+  function applyVisibility() {
     const needle = search.value.trim().normalize('NFKC').toLocaleLowerCase();
     clearQuery.hidden = !search.value;
-    const ordered = [...cards];
-    if (sort.value==='count') ordered.sort((a,b)=>Number(b.dataset.count)-Number(a.dataset.count));
-    if (sort.value==='updated') ordered.sort((a,b)=>Number(a.dataset.updated)-Number(b.dataset.updated));
     let count = 0;
-    for (const el of ordered) {
+    for (const el of cards) {
       el.hidden = !el.dataset.name!.includes(needle);
       if (!el.hidden) count++;
-      grid.append(el);
     }
-    document.querySelector<HTMLElement>('[data-count-label]')!.textContent = String(count);
-    document.querySelector<HTMLElement>('[data-list-title]')!.textContent = needle ? '公司搜索结果' : '全部公司';
-    document.querySelector<HTMLElement>('[data-awards]')!.hidden = Boolean(needle) || cards.length===0;
-    document.querySelector<HTMLElement>('#no-results')!.hidden = count > 0;
-    document.querySelector<HTMLElement>('#results')!.textContent = `共 ${count} 家公司`;
+    countLabel.textContent = String(count);
+    listTitle.textContent = needle ? '公司搜索结果' : '全部公司';
+    awards.hidden = Boolean(needle) || cards.length===0;
+    noResults.hidden = count > 0;
+    results.textContent = `共 ${count} 家公司`;
   }
-  search.addEventListener('input', refresh);
-  sort.addEventListener('change', refresh);
-  function resetSearch() { search.value = ''; refresh(); search.focus(); }
+
+  function applySort() {
+    const ordered = sort.value === 'grade' ? [...initialOrder] : [...cards];
+    if (sort.value==='count') ordered.sort((a,b)=>Number(b.dataset.count)-Number(a.dataset.count));
+    if (sort.value==='updated') ordered.sort((a,b)=>Number(a.dataset.updated)-Number(b.dataset.updated));
+    for (const el of ordered) grid.append(el);
+  }
+
+  search.addEventListener('input', applyVisibility);
+  sort.addEventListener('change', () => { applySort(); applyVisibility(); });
+  function resetSearch() { search.value = ''; applyVisibility(); search.focus(); }
   clearQuery.addEventListener('click',resetSearch);
   document.querySelector('#clear-search')?.addEventListener('click',resetSearch);
-  refresh();
+  applyVisibility();
 </script>

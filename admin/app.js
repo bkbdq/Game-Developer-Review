@@ -121,7 +121,7 @@ function setStatus(element, message, isError = false) {
 }
 
 function describeError(error) {
-  if (error instanceof TypeError) return '无法连接审核 API，请确认本地控制台窗口仍在运行，或网络能访问 gdr-admin.pages.dev（必要时开启代理后刷新）。';
+  if (error instanceof TypeError) return '无法连接审核 API，请确认本地控制台窗口仍在运行，或网络能访问 admin.goodcorp.games（必要时开启代理后刷新）。';
   if (error.status === 401) return error.body?.message || 'token 已失效或权限不足，请重新登录。';
   if (error.status === 403) return error.body?.message || '没有仓库写权限，请检查 token 权限。';
   if (error.status === 404) return error.body?.message || '仓库或文件不存在，请检查配置与权限。';

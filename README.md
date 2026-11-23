@@ -2,8 +2,10 @@
 
 > 一个面向游戏行业从业者的匿名公司评价平台：说真话，不被认出来。
 
-- 匿名问卷：https://gdr-survey.pages.dev/
-- 展示站（GitHub Pages）：https://bkbdq.github.io/Game-Developer-Review/
+- 展示站：https://goodcorp.games/
+- 匿名问卷：https://survey.goodcorp.games/
+- GitHub Pages 镜像：https://github.goodcorp.games/
+- 开发预览：https://dev.goodcorp.games/
 
 ## 这是什么
 
@@ -46,24 +48,26 @@ Game-Developer-Review 是一个游戏行业的匿名评价平台。你可以匿�
 ## 怎么运作
 
 ```text
-匿名问卷（Cloudflare Pages）
+匿名问卷（survey.goodcorp.games）
         │ 提交，写入 D1 待审队列
         ▼
-管理员本地控制台（127.0.0.1）
+管理员控制台（本地 127.0.0.1 或 admin.goodcorp.games）
         │ 审核、脱敏、通过或拒绝
         ▼
 公开数据仓库（GitHub main）
         │ 审核通过后写入 data/
-        ▼
-静态展示站（Cloudflare Pages）
-        │ 构建、发布
-        ▼
-访客浏览
+        ├──────────────────────────────┐
+        ▼                              ▼
+本地控制台构建正式站             GitHub Actions 构建
+（只读 data/）                   （只读 data/）
+        ▼                              ▼
+Cloudflare Pages gdr-site       GitHub Pages 镜像
+goodcorp.games                  github.goodcorp.games
 ```
 
-审核通过后，本地控制台会自动从 `main` 拉取最新数据、构建并部署展示站；没有配置部署密钥的管理员也可以只完成审核。
+审核通过后，本地控制台会自动从 `main` 拉取最新数据、构建正式站并部署到 Cloudflare；GitHub Actions 同时把同一份数据发布到 GitHub Pages 镜像。没有配置 Cloudflare 部署密钥的管理员也可以只完成审核。
 
-**环境分工**：`main` 是正式环境，只包含真实数据，发布到 GitHub Pages；`dev` 额外带 `data-test/` 测试数据，发布到 Cloudflare 预览。审核通过后，两边会同步更新。
+**环境分工**：`main` 是正式环境，只包含真实数据；`dev` 额外带 `data-test/` 测试数据，通过 `npm run deploy:dev` 发布到 `dev.goodcorp.games` 预览。`gdr-survey`、`gdr-admin` 和 `gdr-site` 是三个独立的 Cloudflare Pages 项目，分别对应问卷、审核台和展示站。
 
 ## 项目组成
 
@@ -144,10 +148,11 @@ GitHub 的细粒度令牌不支持写别人的个人仓库，协作者请用 cla
 
 ### 更新展示站
 
-- 审核通过后会提交到 `main`，GitHub Pages 正式站自动构建更新
-- 本机配置了 `CLOUDFLARE_API_TOKEN` 时，还会额外构建一份带 `data-test/` 的 Cloudflare 预览并部署
-- 没有配置 token 时只更新 GitHub Pages；Cloudflare 预览可稍后点工具栏的「更新展示站」手动触发
+- 审核通过后会提交到 `main`，GitHub Actions 自动把正式站同步到 GitHub Pages 镜像 `github.goodcorp.games`
+- 本机配置了 `CLOUDFLARE_API_TOKEN` 时，审核台会从 `origin/main` 重新构建正式站（只读 `data/`）并部署到 Cloudflare Pages `gdr-site`，对外地址是 `goodcorp.games`
+- 没有配置 token 时只更新 GitHub Pages 镜像；Cloudflare 正式站可稍后点工具栏的「更新展示站」手动触发，或执行 `npm run deploy:site`
 - 自动部署从 `origin/main` 拉最新数据，不会使用本地未提交的修改
+- 开发预览单独发布：在 `dev` 分支执行 `npm run deploy:dev`，构建 `data/` + `data-test/` 并部署到 `gdr-site-dev`（`dev.goodcorp.games`）
 
 可选配置（文件在仓库外）：
 

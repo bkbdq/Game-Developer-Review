@@ -31,8 +31,9 @@
 - [x] 零依赖测试脚本 `scripts/test-m2.mjs`
 - [x] 复用 D1 `goodcompany` 并执行迁移
 - [x] 创建 `gdr-survey` / `gdr-admin` 两个 Pages 项目并绑定 D1
-- [x] 问卷页部署到 Cloudflare Pages（`gdr-survey.pages.dev`）
-- [ ] 接入自定义域名（免费版不能单独托管子域，方案待定）
+- [x] 问卷页部署到 Cloudflare Pages（`survey.goodcorp.games`）
+- [x] 接入自定义域名 `goodcorp.games`，DNS 托管 Cloudflare
+- [x] 旧 `gdr-survey.pages.dev` 301 到 `survey.goodcorp.games`
 - [ ] 填写问卷兜底收件邮箱
 - [ ] PoW 挑战改为服务端签发（当前由客户端生成，仅防脚本误提交）
 - [ ] 客户端 PoW 难度与服务端 `POW_DIFFICULTY` 联动
@@ -55,7 +56,7 @@
 - [x] 拒绝：标记 D1 为 `rejected` 并记录原因
 - [x] 审计日志写入 D1 `audit_log`
 - [ ] GitHub OAuth Device Flow 登录（替代手动粘贴 PAT）
-- [x] 控制台部署后与真实 token 联调（`gdr-admin.pages.dev`）
+- [x] 控制台部署后与真实 token 联调（`admin.goodcorp.games`）
 - [x] 本地一键控制台 `start-admin.cmd`，通过后自动构建并部署展示站
 - [ ] 批量通过（仅限已匹配公司且无敏感词命中）
 - [ ] 敏感词 / 正则扫描（手机号、身份证、邮箱、常见人名）
@@ -70,13 +71,14 @@
 - [x] `site-deploy.yml`
 - [x] 首次 `dev → main` 合并，控制台 `publicBranch` 已改回 `main`
 - [x] 移除 `data/companies` 与 `data/reviews` 中的演示数据
-- [x] 本地控制台通过后自动构建并部署 `gdr-site`
-- [ ] 开启 GitHub Pages 并恢复 `site-deploy.yml` 的 push 触发
+- [x] 本地控制台通过后自动构建正式站并部署 `gdr-site`（只读 `data/`）
+- [x] 开启 GitHub Pages，镜像到 `github.goodcorp.games`
+- [x] Cloudflare Pages 主域 `goodcorp.games` 与开发预览 `dev.goodcorp.games`
 - [ ] 配置 `main` / `dev` 分支保护与 CODEOWNERS 实际权限
 
 ## M5 上线加固
 
-- [ ] 自定义域名、HTTPS、`CNAME`
+- [x] 自定义域名、HTTPS、旧 `pages.dev` 301
 - [ ] 备用境外提交端点与客户端切换
 - [ ] 隐私说明、免责声明、审核红线文本
 - [ ] 电信 / 联通 / 移动 / 广电多网络实测

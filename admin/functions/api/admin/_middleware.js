@@ -1,5 +1,5 @@
 const LOCAL_ORIGIN = /^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d+$/;
-const ALLOWED_ORIGINS = new Set(['https://gdr-admin.pages.dev']);
+const ALLOWED_ORIGINS = new Set(['https://admin.goodcorp.games', 'https://gdr-admin.pages.dev']);
 
 function corsHeaders(origin) {
   const headers = new Headers();

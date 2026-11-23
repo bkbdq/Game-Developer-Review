@@ -3,23 +3,27 @@ import Layout from '../../../components/Layout.astro';
 import ProjectCover from '../../../components/ProjectCover.astro';
 import ProjectStatus from '../../../components/ProjectStatus.astro';
 import ReviewCard from '../../../components/ReviewCard.astro';
+import RatingDetails from '../../../components/RatingDetails.astro';
 import { projects } from '../../../lib/projects';
 import { href } from '../../../lib/data';
+import { surveyUrl } from '../../../lib/survey';
+import '../../../styles/studios.css';
 export function getStaticPaths() {
   return projects.map(p=>({params:{company:p.slug,id:p.id},props:{project:p}}));
 }
 const { project:p }=Astro.props;
+const writeUrl = surveyUrl(p.company,p.name);
 ---
-<Layout title={p.name} active="projects" dark>
+<Layout title={p.name} active="projects" company={p.company} project={p.name} dark>
   <nav class="project-crumb" aria-label="面包屑"><a href={href()}>项目发现</a> / <a href={href('company/'+p.slug+'/')}>{p.company}</a> / {p.name}</nav>
   <header class="project-mast"><ProjectCover project={p} eager/><div>
     <a class="studio-link" href={href('company/'+p.slug+'/')}>{p.company} ↗</a>
     <h1>{p.name}</h1><ProjectStatus status={p.statusKey}/>
-    <div class="feature-grade"><b class:list={['grade',{neutral:p.ratio<.7}]}>{p.grade}</b><span>（{p.count} 篇评价）</span></div>
-    <p>近 30 天 {p.recentPositive} 篇好评{p.count>0 && ` · 总好评率 ${Math.round(p.ratio*100)}%`}</p>
+    <RatingDetails rating={p}/>
+    <a class="review-cta" href={writeUrl}>评价这个项目 <span aria-hidden="true">→</span></a>
   </div></header>
   <section class="project-reviews" aria-labelledby="project-reviews"><div class="discovery-section-head"><h2 id="project-reviews"><i aria-hidden="true"></i>全部项目评价<small>{p.count}</small></h2></div>
-    {p.reviews.map(r=><ReviewCard review={r} verdict/>)}
-    {p.count===0 && <p class="project-empty">这个项目暂时还没有公开评价。</p>}
+    {p.reviews.map(r=><ReviewCard review={r} showTenure={p.rated}/>)}
+    {p.count===0 && <div class="project-empty">这个项目还没有公开评价<div><a class="review-cta" href={writeUrl}>成为第一个评价的人</a></div></div>}
   </section>
 </Layout>

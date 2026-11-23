@@ -3,54 +3,59 @@ import Layout from '../../components/Layout.astro';
 import StudioMasthead from '../../components/StudioMasthead.astro';
 import ProjectTile from '../../components/ProjectTile.astro';
 import ReviewCard from '../../components/ReviewCard.astro';
-import { projectsByStudio } from '../../lib/projects';
+import RatingDetails from '../../components/RatingDetails.astro';
+import { companyRatings, projectsByStudio } from '../../lib/projects';
+import { surveyUrl } from '../../lib/survey';
 import '../../styles/studios.css';
-import { detail, index, href, taxonomy, scoreText, label } from '../../lib/data';
+import { detail, index, href, scoreText } from '../../lib/data';
 export function getStaticPaths() {
   return index.companies.map(c => ({ params: { slug: c.slug }, props: { data: detail(c.id) } }));
 }
-const { company, projects, byProfile, reviews } = Astro.props.data;
+const { company, projects, reviews } = Astro.props.data;
 const ordered = [...reviews].sort((a,b)=>b.publishedAt.localeCompare(a.publishedAt));
-const visibleStats = company.reviewCount >= 3;
-const dimensions = [
-  ['tenure','司龄',taxonomy.tenures],
-  ['employment','在职状态',taxonomy.employments], ['city','城市',taxonomy.cities],
-] as const;
-const groups = dimensions.flatMap(([key,title,items])=>(byProfile?.[key] || [])
-  .filter(cell=>cell.count>=3).map(cell=>({...cell,title,text:label(items,cell.key)})));
-const tenures = new Set(reviews.map(r=>r.profile?.tenure).filter(Boolean));
+const rating = companyRatings.get(company.id)!;
+const projectNames = new Map(projects.map(p=>[p.id,p.name]));
+const writeUrl = surveyUrl(company.name);
 const titles = projectsByStudio.get(company.slug) ?? [];
 ---
-<Layout title={company.name} active="companies" dark>
+<Layout title={company.name} active="companies" company={company.name} dark>
   <nav class="studio-back" aria-label="返回导航"><a class="review-cta" href={href('companies/')}><span aria-hidden="true">←</span> 返回公司目录</a></nav>
   <StudioMasthead company={company}/>
+  <section class="studio-rating-band" aria-label="公司评级">
+    <RatingDetails rating={rating}/>
+    <a class="review-cta" href={writeUrl}>评价这家公司 <span aria-hidden="true">→</span></a>
+  </section>
   <nav class="studio-nav" aria-label="公司主页分区">
-    <a href="#works">旗下项目 <small>{titles.length}</small></a><a href="#reviews">开发者评价 <small>{reviews.length}</small></a>{visibleStats && <a href="#ratings">评分概况</a>}
+    <a href="#works">旗下项目 <small>{titles.length}</small></a><a href="#reviews">开发者评价 <small>{reviews.length}</small></a>{rating.rated && <a href="#ratings">评分概况</a>}
   </nav>
-  <div class:list={['studio-layout',{'with-stats':visibleStats}]}>
+  <div class:list={['studio-layout',{'with-stats':rating.rated}]}>
     <div class="studio-main">
     <section id="works" aria-labelledby="works-title"><div class="discovery-section-head"><h2 id="works-title"><i aria-hidden="true"></i>旗下项目</h2></div>
       <div class="studio-projects">{titles.map(p=><ProjectTile project={p} inStudio/>)}</div>
-      {titles.length===0 && <p class="project-empty">暂无收录项目</p>}
+      {titles.length===0 && <div class="project-empty">暂无收录项目<div><a href={writeUrl} class="review-cta">评价这家公司</a></div></div>}
     </section>
     <section id="reviews" class="project-reviews studio-reviews" aria-labelledby="reviews-title">
       <div class="discovery-section-head"><h2 id="reviews-title"><i aria-hidden="true"></i>开发者评价<small id="matches" aria-live="polite">{reviews.length}</small></h2></div>
-      <div class="filters">
-        <label>项目<select id="project"><option value="">全部项目</option>{projects.map(p=><option value={p.id}>{p.name}</option>)}</select></label>
-        <label>司龄<select id="tenure"><option value="">全部司龄</option>{taxonomy.tenures.filter(x=>tenures.has(x.key)).map(x=><option value={x.key}>{x.label}</option>)}</select></label>
-      </div>
+      {rating.rated && <div class="filters"><label>项目<select id="project"><option value="">全部项目</option><option value="anonymous">匿名项目</option>{projects.map(p=><option value={p.id}>{p.name}</option>)}</select></label></div>}
       <div class="reviews">
-        {ordered.map(r=><ReviewCard review={r} projectName={projects.find(p=>p.id===r.projectId)?.name}/>)}
+        {ordered.map(r=>{
+          const projectId = rating.rated && r.projectId && projectNames.has(r.projectId) ? r.projectId : undefined;
+          return <ReviewCard review={r} showTenure={rating.rated}
+            projectName={rating.rated ? (projectId ? projectNames.get(projectId) : '匿名项目') : undefined}
+            projectFilter={rating.rated ? (projectId ?? 'anonymous') : undefined}/>;
+        })}
       </div>
-      <div class="project-empty" id="no-reviews" hidden={reviews.length>0}><strong>{reviews.length ? '没有符合这些条件的评价' : '暂无公开评价'}</strong>{reviews.length>0 && <div><button id="reset" type="button">清除筛选</button></div>}</div>
+      <div class="project-empty" id="no-reviews" hidden={reviews.length>0}>
+        {reviews.length>0 ? <>这个项目还没有公开评价<div><button id="reset" type="button">查看全部评价</button></div></> :
+          <>暂无公开评价<div><a href={writeUrl} class="review-cta">成为第一个评价的人</a></div></>}
+      </div>
     </section>
     </div>
-    {visibleStats && <aside id="ratings" aria-labelledby="ratings-title" class="studio-insights">
+    {rating.rated && <aside id="ratings" aria-labelledby="ratings-title" class="studio-insights">
       <div class="discovery-section-head"><h2 id="ratings-title"><i aria-hidden="true"></i>评分概况</h2></div>
       <section class="studio-stat"><h3>评分分布</h3><p class="studio-stat-average"><strong>{scoreText(company.avgScore)}</strong> / 5 <span>共 {company.reviewCount} 篇评价</span></p>
         {[5,4,3,2,1].map(n=><div class="bar-row"><span>{n} 星</span><div class="track"><i style={{width:(company.scoreDistribution[n] || 0)/company.reviewCount*100+'%'}}></i></div><b>{company.scoreDistribution[n] || 0}</b></div>)}
       </section>
-      {groups.length>0 && <section class="studio-stat"><h3>画像统计</h3>{groups.map(g=><div class="group-row"><span>{g.title} · {g.text}</span><small>{g.count} 条 · 均分 {scoreText(g.avgScore)}</small></div>)}</section>}
     </aside>}
   </div>
 </Layout>

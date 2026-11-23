@@ -7,16 +7,17 @@
   <title>游戏行业匿名评价</title>
   <link rel="stylesheet" href="/style.css">
 </head>
-<body data-fallback-email="">
+<body>
   <header class="site-header">
-    <strong>游戏行业匿名评价</strong>
-    <span>审核后才会公开展示</span>
+    <strong>goodcorp</strong>
+    <span>匿名评价</span>
   </header>
 
   <main>
     <section class="intro">
       <h1>说说你待过的游戏公司</h1>
-      <p>所有字段由你自愿填写，不收集姓名、邮箱、手机号或账号。提交后进入人工审核，审核通过才会以匿名形式展示。</p>
+      <p>写下亲身经历的事实与感受。评价经人工审核后匿名展示。</p>
+      <p id="survey-subject" hidden></p>
     </section>
 
     <div id="draft-note" class="notice" hidden>已恢复上次未完成的内容。</div>
@@ -32,7 +33,9 @@
 
       <div class="field">
         <label for="project">项目名</label>
-        <input id="project" name="project" type="text" maxlength="50" autocomplete="off">
+        <input id="project" name="project" type="text" maxlength="50" autocomplete="off" disabled>
+        <noscript><small>当前按匿名项目提交。启用脚本后可填写项目名。</small></noscript>
+        <div id="anonymous-project-option" hidden><label class="consent"><input type="checkbox" name="anonymousProject">不公开项目名</label></div>
       </div>
 
       <div class="field">
@@ -48,63 +51,20 @@
       </div>
 
       <div class="field">
-        <label for="comment">评价正文 <em>必填</em></label>
-        <textarea id="comment" name="comment" rows="6" maxlength="2000" required placeholder="只写事实与感受，不写真实姓名、联系方式和未公开的内部代号。"></textarea>
-        <small>最多 2000 字，最多两个链接。</small>
+        <label for="tenure">在职时长（选填）</label>
+        <select name="tenure" id="tenure">
+          <option value="">不填</option>
+          <option value="lt1y">1 年以内</option>
+          <option value="1-3y">1–3 年</option>
+          <option value="3-5y">3–5 年</option>
+          <option value="gt5y">5 年以上</option>
+        </select>
       </div>
 
       <div class="field">
-        <label for="wish">希望被吐槽的内容</label>
-        <textarea id="wish" name="wish" rows="2" maxlength="500" placeholder="选填"></textarea>
+        <label for="comment">评价正文 <em>必填</em></label>
+        <textarea id="comment" name="comment" rows="6" required placeholder="请避开真实姓名、联系方式和未公开的内部代号。"></textarea>
       </div>
-
-      <fieldset class="field profile">
-        <legend>你的画像（选填）</legend>
-        <div class="grid">
-          <label>岗位
-            <select name="role">
-              <option value="">不填</option>
-              <option value="design">策划</option>
-              <option value="program">程序</option>
-              <option value="art">美术</option>
-              <option value="audio">音频</option>
-              <option value="ops">运营</option>
-              <option value="qa">测试</option>
-              <option value="pm">项目管理</option>
-              <option value="other">其他</option>
-            </select>
-          </label>
-          <label>司龄
-            <select name="tenure">
-              <option value="">不填</option>
-              <option value="lt1y">1 年以内</option>
-              <option value="1-3y">1–3 年</option>
-              <option value="3-5y">3–5 年</option>
-              <option value="gt5y">5 年以上</option>
-            </select>
-          </label>
-          <label>状态
-            <select name="employment">
-              <option value="">不填</option>
-              <option value="current">在职</option>
-              <option value="former">已离职</option>
-              <option value="intern">实习</option>
-            </select>
-          </label>
-          <label>城市
-            <select name="city">
-              <option value="">不填</option>
-              <option value="beijing">北京</option>
-              <option value="shanghai">上海</option>
-              <option value="guangzhou">广州</option>
-              <option value="shenzhen">深圳</option>
-              <option value="chengdu">成都</option>
-              <option value="hangzhou">杭州</option>
-              <option value="other">其他</option>
-            </select>
-          </label>
-        </div>
-      </fieldset>
 
       <label class="consent">
         <input type="checkbox" name="consent" required>
@@ -129,18 +89,21 @@
     </form>
 
     <section id="success-panel" class="panel" hidden>
-      <h2>提交成功</h2>
+      <h2 tabindex="-1">提交成功</h2>
       <p>回执编号：<code id="receipt"></code></p>
-      <p>内容将在人工审核后展示。请保存回执编号，便于后续查询或删除。</p>
-      <button type="button" id="again-button">再提交一条</button>
+      <p><strong>请立即保存回执。回执只显示这一次。</strong> 经审核通过后，评价会在展示站公开。</p>
+      <div class="actions">
+        <a id="company-return" class="button" href="https://bkbdq.github.io/Game-Developer-Review/companies/">查看公司目录</a>
+        <button type="button" id="again-button" class="ghost">再写一条</button>
+        <a data-site-path="requests/" href="https://bkbdq.github.io/Game-Developer-Review/requests/">申请删除或更正</a>
+      </div>
     </section>
 
     <section id="fallback-panel" class="panel" hidden>
       <h2>提交未完成</h2>
-      <p>网络似乎不太稳定，内容已保存在本机。你可以复制内容后稍后重试，配置邮箱后也可直接邮件发送。</p>
+      <p>尚未收到提交确认。可以重试，或先复制内容。</p>
       <div class="actions">
         <button type="button" id="copy-button">复制内容</button>
-        <a id="mail-link" class="button" href="mailto:" hidden>邮件提交</a>
         <button type="button" id="retry-button">重新提交</button>
         <button type="button" id="delete-button" class="ghost">删除本地副本</button>
       </div>
@@ -153,7 +116,7 @@
   </main>
 
   <footer>
-    <p>不收集姓名、邮箱、手机号；IP 仅以加盐哈希形式短期保存，用于防刷。</p>
+    <a data-site-path="privacy/" href="https://bkbdq.github.io/Game-Developer-Review/privacy/">隐私与匿名说明</a>
   </footer>
 
   <script type="module" src="/app.js"></script>

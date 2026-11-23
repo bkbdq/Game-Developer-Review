@@ -1,6 +1,20 @@
 ---
-import { minimumPositiveRatio, type reviewRating } from '../lib/project-stats';
-interface Props { rating: ReturnType<typeof reviewRating> }
+import { minimumRatingCount, type Rating } from '../lib/project-stats';
+interface Props { rating: Rating }
 const { rating } = Astro.props;
+const hint = rating.rated ? undefined : `满 ${minimumRatingCount} 篇后显示等级`;
 ---
-<span class="rating-summary"><b class:list={['grade', { neutral: rating.ratio < minimumPositiveRatio }]}>{rating.grade}</b><small>{rating.count} 篇评价</small></span>
+<span class="rating-summary" data-tone={rating.tone} title={hint}>
+  <b class="grade">{rating.grade}</b>
+  <small>{rating.count} 篇评价</small>
+  {rating.rated && rating.ratio === null && <small>以中评为主</small>}
+</span>
+
+<style>
+  .rating-summary { --rating-color:#b5bec6; }
+  .rating-summary[data-tone=positive] { --rating-color:#9de5b5; }
+  .rating-summary[data-tone=neutral] { --rating-color:#efcc85; }
+  .rating-summary[data-tone=negative] { --rating-color:#ffabac; }
+  .rating-summary[data-tone] { border-color:var(--rating-color); }
+  .rating-summary[data-tone] .grade { color:var(--rating-color); }
+</style>

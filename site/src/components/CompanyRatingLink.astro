@@ -1,0 +1,12 @@
+---
+import { href } from '../lib/data';
+import type { Project } from '../lib/projects';
+interface Props { project: Project }
+const { project } = Astro.props;
+const rating = project.companyRating;
+---
+<a class="company-rating-link" href={href('company/' + project.slug + '/')}
+  aria-label={`进入${project.company}主页，公司评级：${rating.grade}，${rating.count} 篇评价`}>
+  <span>{project.company} <span aria-hidden="true">↗</span></span>
+  <small data-tone={rating.tone}>公司评级 · {rating.grade} · {rating.count} 篇评价</small>
+</a>

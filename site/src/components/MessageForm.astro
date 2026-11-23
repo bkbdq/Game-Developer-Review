@@ -1,0 +1,67 @@
+---
+import {href} from '../lib/data';
+const {author = false} = Astro.props;
+const endpoint = author ? import.meta.env.PUBLIC_REVIEW_REQUEST_ENDPOINT : import.meta.env.PUBLIC_CONTACT_ENDPOINT;
+---
+<p>{author ? '仅供评价作者使用。请填写提交时获得的回执和需要处理的内容。' : '请说明遇到的问题。涉及某家公司或评价时，可以附上页面链接。'}</p>
+{!endpoint && <p class="notice">此通道暂未开放。可以先整理并复制{author ? '申请' : '问题'}，开放后再提交。</p>}
+<noscript><p>请启用 JavaScript 后填写表单，以便安全处理内容。</p></noscript>
+<form class="message-form" method="post" data-endpoint={endpoint || ''}>
+  <fieldset disabled>
+  {author && <><label>回执编号<input name="receipt" required autocomplete="off" /></label>
+  <label>申请类型<select name="type"><option value="correction">更正评价</option><option value="deletion">删除评价</option></select></label></>}
+  <label>{author ? '申请原因' : '问题说明'}<textarea name="message" rows="5" required></textarea></label>
+  {!author && <label>联系方式（选填）<input name="contact" autocomplete="off" /></label>}
+  <button type="submit">{endpoint ? (author ? '提交申请' : '发送消息') : (author ? '复制申请内容' : '复制问题说明')}</button>
+  </fieldset>
+  <p class="feedback" role="status"></p>
+</form>
+<p class="related">{author ? <a href={href('contact/')}>公司或其他读者请联系我们</a> : <a href={href('requests/')}>我是评价作者，需要更正或删除评价</a>}</p>
+<script>
+  for (const form of document.querySelectorAll<HTMLFormElement>('.message-form[data-endpoint]')) {
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const submit = form.querySelector('button')!;
+      const status = form.querySelector<HTMLElement>('.feedback')!;
+      if (submit.disabled) return;
+      const values = new FormData(form);
+      if (!String(values.get('message') ?? '').trim() || (values.has('receipt') && !String(values.get('receipt')).trim())) {
+        status.textContent = '请补全必填内容。'; return;
+      }
+      if (!form.dataset.endpoint) {
+        const lines = [String(values.get('message')).trim()];
+        if (values.get('receipt')) lines.push('回执：' + values.get('receipt'), '申请：' + (values.get('type') === 'deletion' ? '删除' : '更正'));
+        if (values.get('contact')) lines.push('联系：' + values.get('contact'));
+        try { await navigator.clipboard.writeText(lines.join('\n')); status.textContent = '已复制到剪贴板，内容尚未发送。'; }
+        catch { status.textContent = '请选中填写的内容并手动复制。'; }
+        return;
+      }
+      submit.disabled = true;
+      status.textContent = '正在发送…';
+      try {
+        const response = await fetch(form.dataset.endpoint!, {
+          method:'POST', headers:{'Content-Type':'application/json', Accept:'application/json'},
+          body:JSON.stringify(Object.fromEntries(values)),
+        });
+        if (!response.ok || (await response.json()).ok !== true) throw new Error('未确认收件');
+        form.reset();
+        status.textContent = '已收到，平台会定期处理。';
+      } catch {
+        status.textContent = '未收到提交确认。请保留内容，稍后重试。';
+      } finally { submit.disabled = false; }
+    });
+    form.querySelector('fieldset')!.disabled = false;
+  }
+</script>
+<style>
+  .message-form { display:grid; gap:16px; margin:18px 0; }
+  fieldset { border:0; padding:0; margin:0; min-width:0; display:grid; gap:16px; }
+  label { display:grid; gap:4px; }
+  input,textarea,select { width:100%; padding:10px; border:1px solid #546c7a; background:#142936; color:inherit; border-radius:3px; font:inherit; }
+  textarea { resize:vertical; }
+  button { justify-self:start; min-height:44px; background:#9ae1e3; color:#122b38; border:0; padding:0 18px; border-radius:4px; font-weight:700; }
+  button:disabled { opacity:.7; }
+  .notice { padding:12px 14px; border-left:3px solid #d2b479; background:#283740; }
+  .related a { display:inline-flex; align-items:center; min-height:44px; }
+  .feedback:empty { display:none; }
+</style>

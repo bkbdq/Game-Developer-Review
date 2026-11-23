@@ -7,16 +7,18 @@ import { projects, recentPicks, asOf } from '../lib/projects';
 import { isRecentPick, minimumPositiveRatio, minimumPickScore } from '../lib/project-stats';
 import { index, href } from '../lib/data';
 import { getBoardPageSizes } from '../lib/project-board';
+import { surveyUrl } from '../lib/survey';
 import '../styles/project-board.css';
 const boardPages = getBoardPageSizes(recentPicks.length);
 ---
 <Layout title="项目发现" active="projects" dark>
   <div class="discover-home" data-arcade-url={href('arcade/#arcade-title')}>
-    <header class="discovery-intro"><div><h1>项目发现</h1><p>{index.totals.companies} 家公司 <span>·</span> {projects.length} 个游戏项目</p></div><DiscoverySearch/></header>
+    <header class="discovery-intro"><div><h1>项目发现</h1><p class="discovery-purpose">匿名评价游戏公司，帮后来者少踩坑，也帮好团队被看见。</p><p>{index.totals.companies} 家公司 <span>·</span> {projects.length} 个游戏项目</p></div><DiscoverySearch/></header>
     <FeaturedProjects/>
     <section id="projects" class="project-library" aria-labelledby="library-title">
       <div class="discovery-section-head"><h2 id="library-title" tabindex="-1"><span data-library-title>近期好评项目</span><small data-result-count>{recentPicks.length}</small></h2>
-        <details class="ranking-rule"><summary>入选规则 ⓘ</summary><p>截至 {asOf}，项目平均分至少 {minimumPickScore.toFixed(1)} / 5，累计好评率至少 {minimumPositiveRatio * 100}%，且近 30 天有好评，才进入榜单。按近 30 天的四、五星评价篇数排序；同数依次比较累计好评数、总评价数和最近评价日期。</p></details>
+        <button type="button" class="back-to-picks" data-back-to-picks hidden>返回近期好评</button>
+        <details class="ranking-rule"><summary>入选规则 ⓘ</summary><p>截至 {asOf}，收录近 30 天收到四、五星评价、平均分达到 {minimumPickScore.toFixed(1)} / 5，且好评占好差评总数至少 {minimumPositiveRatio * 100}% 的项目，按近期好评篇数排列。满 5 篇后显示等级和好评率，三星中评单独计数。</p></details>
       </div>
       <div class="board-stage" id="project-board">
         <div class="project-grid">
@@ -35,8 +37,8 @@ const boardPages = getBoardPageSizes(recentPicks.length);
         <span data-page-label></span>
         <button type="button" data-page-next>下一页</button>
       </nav>
-      <div class="project-empty" data-no-picks hidden={recentPicks.length>0}><h3>暂无符合条件的近期好评项目</h3></div>
-      <div class="project-empty" data-empty hidden><h3>没有找到匹配的项目</h3><button type="button" data-reset>清空搜索</button></div>
+      <div class="project-empty" data-no-picks hidden={recentPicks.length>0}><h3>暂无符合条件的近期好评项目</h3><a class="review-cta" href={surveyUrl()}>写评价</a><a class="empty-directory" href={href('companies/')}>浏览公司目录</a></div>
+      <div class="project-empty" data-empty hidden><h3>没有找到匹配的项目</h3><button type="button" data-reset>查看全部</button><a class="empty-directory" href={surveyUrl()}>写评价</a></div>
       <p class="sr" role="status" data-search-status></p>
     </section>
   </div>

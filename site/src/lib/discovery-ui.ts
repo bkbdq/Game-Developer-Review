@@ -115,7 +115,7 @@ export function setupDiscovery() {
   const menu=box.querySelector<HTMLElement>('.search-menu')!;
   const links=Array.from(menu.querySelectorAll<HTMLAnchorElement>('[data-search]'));
   const board=home.querySelector<HTMLElement>('#projects')!;
-  const tiles=Array.from(board.querySelectorAll<HTMLAnchorElement>('[data-project]'));
+  const tiles=Array.from(board.querySelectorAll<HTMLElement>('[data-project]'));
   const picks=tiles.filter(tile=>tile.hasAttribute('data-pick'));
   const status=home.querySelector<HTMLElement>('[data-search-status]')!;
   const pagination=home.querySelector<HTMLElement>('.project-pagination')!;
@@ -130,9 +130,10 @@ export function setupDiscovery() {
   const dots=Array.from(indicators.querySelectorAll<HTMLButtonElement>('[data-board-dot]'));
   const groups=getBoardPageSizes(picks.length);
   const groupCount=groups.length;
-  const positions={overview:0, search:0};
+  const positions={overview:0, search:0, all:0};
   let mode:keyof typeof positions='overview';
   let previousQuery='';
+  let browseAll=false;
   let results=picks;
 
   function renderPage() {
@@ -179,10 +180,10 @@ export function setupDiscovery() {
     e.preventDefault();
     showGroup(positions.overview+(e.key==='ArrowRight'?1:-1));
     if (indicators.contains(control)) dots[positions.overview].focus();
-    else if (fromTile) board.querySelector<HTMLElement>('[data-board-slot="1"]')?.focus();
+    else if (fromTile) board.querySelector<HTMLElement>('[data-board-slot="1"] .tile-project-link')?.focus();
   });
   function turnPage(step: number) {
-    positions.search+=step;
+    positions[mode]+=step;
     renderPage();
     status.textContent=`${pageLabel.textContent}，共 ${results.length} 个项目`;
     heading.focus({preventScroll:true});
@@ -194,17 +195,18 @@ export function setupDiscovery() {
     const query=input.value.trim().normalize('NFKC').toLocaleLowerCase();
     if (query!==previousQuery) positions.search=0;
     previousQuery=query;
-    mode=query ? 'search' : 'overview';
-    results=query ? tiles.filter(tile=>tile.dataset.project!.includes(query)) : picks;
+    mode=query ? 'search' : browseAll ? 'all' : 'overview';
+    results=query ? tiles.filter(tile=>tile.dataset.project!.includes(query)) : browseAll ? tiles : picks;
     const count=results.length;
     renderPage();
     clear.hidden=!query;
     if(feature) feature.hidden=Boolean(query);
-    home.querySelector<HTMLElement>('[data-library-title]')!.textContent=query?'项目搜索结果':'近期好评项目';
+    home.querySelector<HTMLElement>('[data-library-title]')!.textContent=query?'项目搜索结果':browseAll?'全部项目':'近期好评项目';
     home.querySelector<HTMLElement>('[data-result-count]')!.textContent=String(count);
     home.querySelector<HTMLElement>('[data-empty]')!.hidden=!query || count!==0;
     home.querySelector<HTMLElement>('[data-no-picks]')!.hidden=Boolean(query) || count!==0;
-    home.querySelector<HTMLElement>('.ranking-rule')!.hidden=Boolean(query);
+    home.querySelector<HTMLElement>('.ranking-rule')!.hidden=mode!=='overview';
+    home.querySelector<HTMLElement>('[data-back-to-picks]')!.hidden=mode!=='all';
     const matches=links.filter(link=>link.dataset.search!.includes(query));
     // Prefer direct company or project name matches over a project matched via its parent company.
     const rank=(link:HTMLAnchorElement)=>{
@@ -224,7 +226,12 @@ export function setupDiscovery() {
   const visibleLinks=()=>Array.from(menu.querySelectorAll<HTMLAnchorElement>('a:not([hidden])'));
   function reset(){input.value=''; update(false); input.focus();}
   clear.addEventListener('click',reset);
-  home.querySelector('[data-reset]')!.addEventListener('click',reset);
+  home.querySelector('[data-reset]')!.addEventListener('click',()=>{
+    browseAll=true; positions.all=0; input.value=''; update(false); heading.focus();
+  });
+  home.querySelector('[data-back-to-picks]')!.addEventListener('click',()=>{
+    browseAll=false; update(false); heading.focus();
+  });
   input.addEventListener('input',()=>update(true));
   input.addEventListener('focus',()=>update(true));
   box.addEventListener('keydown',e=>{

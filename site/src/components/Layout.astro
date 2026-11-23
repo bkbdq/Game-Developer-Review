@@ -2,7 +2,8 @@
 import '../styles/site.css';
 import '../styles/discovery.css';
 import { href, isDemo } from '../lib/data';
-const { title, active = 'companies', dark = false } = Astro.props;
+import { surveyUrl } from '../lib/survey';
+const { title, active, dark = false, company, project } = Astro.props;
 const brand = 'goodcorp';
 const routes = [['projects','','项目发现'],['companies','companies/','公司目录'],['arcade','arcade/','夜班投递']];
 ---
@@ -18,9 +19,39 @@ const routes = [['projects','','项目发现'],['companies','companies/','公司
     <header class="topbar"><div class="shell bar-inner">
       <a class="brand" href={href()}><span class="gc-logo" aria-hidden="true"><i></i><i></i></span>{brand}</a>
       <nav aria-label="主导航">{routes.map(([key,path,text])=><a class="nav-link" aria-current={active===key?'page':undefined} href={href(path)}>{text}</a>)}</nav>
-      {isDemo && <span class="demo"><i></i>本地演示</span>}
+      <div class="bar-actions">
+        {isDemo && <span class="demo"><i></i>本地演示</span>}
+        <a class="write-review" href={surveyUrl(company, project)}>写评价</a>
+      </div>
     </div></header>
     <main id="content" class="shell"><slot /></main>
-    <footer class="shell footer"><span>{brand}</span><span>{isDemo ? '本地演示 · 公司、项目与评价均为虚构' : '游戏行业匿名评价'}</span></footer>
+    <footer class="shell footer">
+      <div><strong>{brand}</strong><p>{isDemo ? '本地演示 · 含虚构样例' : '游戏行业匿名评价'}</p></div>
+      <nav aria-label="站点信息">
+        <a href={href('privacy/#anonymous')}>匿名说明</a><a href={href('about/')}>关于</a>
+        <a href={href('privacy/')}>隐私</a><a href={href('contact/')}>联系我们</a>
+      </nav>
+    </footer>
   </body>
 </html>
+<style>
+  .topbar { position:sticky; top:0; z-index:20; }
+  .bar-actions { margin-left:auto; display:flex; align-items:center; gap:14px; }
+  .write-review { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 18px; border-radius:4px; background:#9ae1e3; color:#102b38; font-weight:750; font-size:14px; }
+  .write-review:hover { background:#b6f1ef; }
+  .footer { align-items:center; }
+  .footer p { margin:4px 0 0; }
+  .footer nav { gap:12px; flex-wrap:wrap; }
+  .footer a { display:inline-flex; align-items:center; min-height:44px; padding-inline:4px; }
+  .footer a:hover { color:#a2edf0; text-decoration:underline; }
+  :global(:target) { scroll-margin-top:82px; }
+  @media (max-width:680px) {
+    .topbar .bar-inner { gap:4px 0; padding-top:6px; }
+    .topbar nav { justify-content:space-between; gap:8px; }
+    .topbar .nav-link { align-items:center; min-height:44px; padding:0 4px; }
+    .bar-actions { gap:8px; }
+    .footer { gap:4px; }
+    .footer nav { gap:8px; }
+    :global(:target) { scroll-margin-top:110px; }
+  }
+</style>

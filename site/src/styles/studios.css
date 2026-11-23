@@ -37,6 +37,14 @@
 .award-content p b { color:#f1f7fa; font-size:16px; }
 .studio-art-link { position:absolute; right:14px; bottom:12px; background:#101d29c9; border:1px solid #aec5cb4a; border-radius:3px; padding:4px 9px; color:#e9f5fa; font-size:12px; }
 .studio-art-link:hover { background:#234854; }
+.studio-rating-band {
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px 28px;
+  background:#1c303e; border:1px solid #405969; border-top:0; border-radius:0 0 5px 5px; padding:17px 24px;
+}
+.studio-mast:has(+ .studio-rating-band) { border-radius:6px 6px 0 0; }
+.studio-rating-band .review-cta { flex:none; align-self:flex-start; }
+.studio-rating-band .review-cta,.project-mast .review-cta { min-height:44px; }
+.award-empty-link { color:#a5e7e1; text-decoration:underline; }
 .studio-directory { margin-top:25px; }
 .studio-sort,.studio-reviews .filters label { color:#b9ced8; font-size:12px; }
 .studio-sort { display:flex; align-items:center; gap:8px; }
@@ -53,7 +61,8 @@
 .studio-tile-name .mark { width:51px; height:51px; border:2px solid #263f4e; border-radius:6px; }
 .studio-tile-name > div { min-width:0; padding-top:22px; }
 .studio-tile-name h3 { color:#f2f7f9; font-size:19px; line-height:1.25; letter-spacing:-.035em; overflow-wrap:anywhere; }
-.studio-tile-name small { display:block; font-size:11px; color:#adbfca; margin-top:1px; }
+.studio-tile-numbers,.studio-tile-updated { font-size:12px; color:#c7d6de; line-height:1.55; margin-top:7px; }
+.studio-tile-updated { margin-top:1px; color:#a8bdc8; }
 .studio-tile-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; min-height:28px; color:#acdfe3; overflow-wrap:anywhere; }
 .studio-tile-foot .chips span { font-size:12px; color:#d4e6ed; background:#2b4553; }
 .studio-nav { display:flex; gap:25px; border-bottom:1px solid #405969; margin-bottom:24px; }
@@ -83,6 +92,10 @@
 }
 @media (max-width:680px) {
   .studio-search { width:100%; }
+  .studio-rating-band { padding:14px 16px; flex-wrap:wrap; }
+  .studio-search button,.studio-reviews .filters select,.studio-sort select { min-height:44px; }
+  .studio-search button { min-width:34px; }
+  .award-empty-link { display:inline-flex; align-items:center; min-height:44px; }
  .studio-awards { grid-template-columns:1fr; gap:10px; }
  .award-content { padding:16px; }
   .studio-mast { min-height:218px; align-items:end; }

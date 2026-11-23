@@ -11,8 +11,12 @@ const artwork: Record<string, [string, string]> = {
 };
 export const asOf = new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date(index.generatedAt));
 export const statuses: Record<string,string> = {live:'已上线',dev:'在研',cancelled:'已取消',unknown:'状态未知'};
-export const projects = index.companies.flatMap(c => {
-  const data = detail(c.id);
+const studios = index.companies.map(company => {
+  const data = detail(company.id);
+  return {company, data, rating: projectStats(data.reviews, asOf)};
+});
+export const companyRatings = new Map(studios.map(studio => [studio.company.id, studio.rating]));
+export const projects = studios.flatMap(({company:c, data, rating}) => {
   const aliases = data.company.aliases ?? [];
   return data.projects.map(project => {
     const reviews = data.reviews.filter(r=>r.projectId===project.id).sort((a,b)=>b.publishedAt.localeCompare(a.publishedAt));
@@ -23,7 +27,7 @@ export const projects = index.companies.flatMap(c => {
     const scene = art && href(`images/projects/${art[1]}-2.webp`);
     return {
       id: project.id, name: project.name, statusKey: project.status, status: statuses[project.status] || statuses.unknown,
-      company: c.name, slug:c.slug, aliases, reviews, featuredReview, cover, scene,
+      company: c.name, companyRating:rating, slug:c.slug, aliases, reviews, featuredReview, cover, scene,
       path:href(`project/${encodeURIComponent(c.slug)}/${encodeURIComponent(project.id)}/`),
       search:[c.name,c.slug,...aliases,project.name,art?.[0]].join(' ').normalize('NFKC').toLocaleLowerCase(),
       ...projectStats(reviews,asOf)

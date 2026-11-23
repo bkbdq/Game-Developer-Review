@@ -1,0 +1,22 @@
+---
+import Layout from './Layout.astro';
+import { href } from '../lib/data';
+const {title} = Astro.props;
+---
+<Layout title={title} dark>
+  <article class="info-page">
+    <a class="back" href={href()}>← 项目发现</a>
+    <h1>{title}</h1>
+    <div class="info-content"><slot /></div>
+  </article>
+</Layout>
+<style>
+  .info-page { max-width:740px; margin:32px auto 56px; }
+  .back { display:inline-flex; align-items:center; min-height:44px; font-size:14px; color:#9fdfe2; }
+  h1 { margin:12px 0 24px; font-size:clamp(30px,4vw,44px); letter-spacing:-.04em; }
+  .info-content { padding:clamp(18px,3vw,32px); border:1px solid #3d5463; background:#1c303f; border-radius:5px; line-height:1.75; color:#d8e6eb; }
+  .info-content :global(h2) { color:#edf5f7; font-size:20px; }
+  .info-content :global(section + section) { border-top:1px solid #395160; margin-top:20px; padding-top:18px; }
+  .info-content :global(p) { margin:6px 0; }
+  .info-content :global(a) { color:#a1e3e8; text-decoration:underline; text-underline-offset:3px; }
+</style>

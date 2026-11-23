@@ -1,6 +1,6 @@
 ---
 import Mark from './Mark.astro';
-import { href, scoreText, type Company } from '../lib/data';
+import { href, type Company } from '../lib/data';
 import { projectsByStudio } from '../lib/projects';
 interface Props { company: Company }
 const { company } = Astro.props;
@@ -14,9 +14,8 @@ const banner = featured?.slug === 'cloudcape' && featured.id === 'p_windward'
   <div class="studio-identity">
     <div class="studio-name"><Mark slug={company.slug}/><div>
       <h1>{company.name}</h1>
-      {!!company.aliases?.length && <p>{company.aliases.join(' · ')}</p>}
     </div></div>
-    <div class="studio-metrics"><span><b>{titles.length}</b> 个项目</span><span><b>{company.reviewCount}</b> 篇评价</span><span>综合评分 <b>{scoreText(company.avgScore)}</b> / 5</span></div>
+    <div class="studio-metrics"><span><b>{titles.length}</b> 个项目</span><span><b>{company.reviewCount}</b> 篇评价</span></div>
   </div>
   {featured && <a class="studio-art-link" href={featured.path}>{featured.name} <span aria-hidden="true">↗</span></a>}
 </header>

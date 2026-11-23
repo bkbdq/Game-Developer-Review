@@ -1,0 +1,40 @@
+---
+import { minimumRatingCount, type Rating } from '../lib/project-stats';
+import ReviewRating from './ReviewRating.astro';
+interface Props { rating: Rating }
+const { rating } = Astro.props;
+---
+<div class="rating-detail">
+  <div class="rating-head">
+    <ReviewRating rating={rating}/>
+    {rating.ratio !== null && <div class="rating-percent"><b>{Math.round(rating.ratio * 100)}%</b><small>好评率</small></div>}
+  </div>
+  {rating.rated ? (
+    <ul class="rating-counts" aria-label="评价构成">
+      <li>好评 <b>{rating.positive}</b> 篇</li>
+      <li>中评 <b>{rating.neutral}</b> 篇</li>
+      <li>差评 <b>{rating.negative}</b> 篇</li>
+    </ul>
+  ) : <p class="sample-note">满 {minimumRatingCount} 篇后显示等级</p>}
+  <details class="rating-guide">
+    <summary>评级规则</summary>
+    <p>4–5 星计为好评，3 星计为中评，1–2 星计为差评。好评率 = 好评数 ÷（好评数 + 差评数）。全部为中评时，等级为“褒贬不一（以中评为主）”。</p>
+    <p>本站沿用 Steam 风格的等级名称，按开发者评价独立统计。满 {minimumRatingCount} 篇开始评级，满 20 篇且好评率达到 80% 可获“特别好评”，满 50 篇且达到 95% 可获“好评如潮”。</p>
+  </details>
+</div>
+
+<style>
+  .rating-detail { min-width:0; color:#c1d0da; }
+  .rating-head { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+  .rating-head :global(.rating-summary) { justify-items:start; }
+  .rating-head :global(.grade) { font-size:clamp(20px,2vw,26px); }
+  .rating-percent { display:grid; border-left:1px solid #526471; padding-left:12px; }
+  .rating-percent b { color:#eff4f7; font-variant-numeric:tabular-nums; font-size:20px; line-height:1.3; }
+  .rating-percent small, .rating-detail .sample-note { font-size:13px; }
+  .rating-counts { list-style:none; display:flex; flex-wrap:wrap; gap:4px 14px; padding:0; margin:10px 0 0; font-size:13px; }
+  .rating-detail .sample-note { margin:8px 0 0; color:#becbd4; }
+  .rating-guide { font-size:13px; }
+  .rating-guide summary { padding-block:8px; cursor:pointer; color:#9de3e1; width:fit-content; }
+  .rating-guide[open] p { color:#c1d0da; font-size:13px; margin:0 0 6px; line-height:1.65; }
+  @media (max-width:680px) { .rating-guide summary { min-height:44px; padding-block:12px; } }
+</style>

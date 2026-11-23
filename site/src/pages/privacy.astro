@@ -1,0 +1,9 @@
+---
+import InfoPage from '../components/InfoPage.astro';
+import {href} from '../lib/data';
+---
+<InfoPage title="隐私与匿名说明">
+  <section id="anonymous"><h2>读者会看到什么</h2><p>公开评价会展示评分、正文和发表月份。公司有至少 5 篇评价时，公司页才展示每条评价的项目与在职时长；项目页有至少 5 篇时才展示在职时长。匿名项目评价归在公司名下。</p><p>写作时请省略姓名、联系方式、内部代号，以及容易辨认出你或同事的细节。</p></section>
+  <section><h2>提交与保存</h2><p>写评价无需注册。待审内容存放在 Cloudflare 的数据库中；提交服务会记录提交时间，并可使用网络地址的加盐摘要来限制重复提交。回执用于辨认你的申请，请自行保存。</p><p>审核通过的评价收录在 GitHub 公开仓库中。展示站更新后，旧版本仍可能保存在仓库历史或他人的副本中。待审记录的自动清理周期尚未确认。</p></section>
+  <section><h2>更正、删除和其他问题</h2><p>作者请携带回执进入<a href={href('requests/')}>删除或更正</a>。公司及其他读者可以通过<a href={href('contact/')}>联系我们</a>提供相关页面和问题说明。</p></section>
+</InfoPage>

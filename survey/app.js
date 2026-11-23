@@ -10,11 +10,23 @@ const fallbackStatus = document.querySelector('#fallback-status');
 const copyButton = document.querySelector('#copy-button');
 const retryButton = document.querySelector('#retry-button');
 const deleteButton = document.querySelector('#delete-button');
-const mailLink = document.querySelector('#mail-link');
+const companyReturn = document.querySelector('#company-return');
+const siteBase = new URL('../', companyReturn.href);
+if (document.referrer && ['127.0.0.1','localhost'].includes(location.hostname)) {
+  const source = new URL(document.referrer);
+  if (source.hostname === location.hostname) siteBase.href = source.origin + '/';
+}
+document.querySelectorAll('[data-site-path]').forEach(link => {
+  link.href = new URL(link.dataset.sitePath, siteBase).href;
+});
 const draftNote = document.querySelector('#draft-note');
 const companyList = document.querySelector('#company-options');
 
-const FIELDS = ['company', 'companyId', 'project', 'score', 'comment', 'wish', 'role', 'tenure', 'employment', 'city'];
+const FIELDS = ['company', 'companyId', 'project', 'score', 'tenure', 'comment'];
+const query = new URLSearchParams(location.search);
+const entryCompany = (query.get('company') || '').trim().slice(0, 50);
+const entryProject = (query.get('project') || '').trim().slice(0, 50);
+const anonymousProject = form.elements.namedItem('anonymousProject');
 const DRAFT_KEY = 'gdr.submission.draft.v1';
 const DRAFT_TTL = 7 * 24 * 60 * 60 * 1000;
 const COMPANY_CATALOG_KEY = 'gdr.company.catalog.v1';
@@ -31,6 +43,7 @@ let slowTimer = null;
 let startedAt = Date.now();
 let saveTimer = null;
 let companyIndex = new Map();
+const companySlugs = new Map();
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -117,11 +130,12 @@ function renderCatalog(companies) {
     .filter(company => company && company.id && company.name)
     .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
     .forEach(company => {
+      if (company.slug) companySlugs.set(company.id, company.slug);
       [company.name, ...(company.aliases || [])].forEach(label => {
         const text = String(label || '').trim();
         if (!text || seen.has(text.toLowerCase())) return;
         seen.add(text.toLowerCase());
-        options.push(new Option(text, text));
+        if (label === company.name) options.push(new Option(text, text));
         companyIndex.set(text.toLowerCase(), company.id);
       });
       if (company.slug) companyIndex.set(String(company.slug).toLowerCase(), company.id);
@@ -168,7 +182,18 @@ function readFields() {
   FIELDS.forEach(name => { values[name] = form.elements.namedItem(name)?.value ?? ''; });
   values.website = form.elements.namedItem('website')?.value ?? '';
   values.consent = form.elements.namedItem('consent')?.checked ?? false;
+  if (anonymousProject.checked) delete values.project;
   return values;
+}
+
+function updateSubject() {
+  const company = form.elements.namedItem('company').value.trim();
+  const project = form.elements.namedItem('project').value.trim();
+  const subject = document.querySelector('#survey-subject');
+  document.querySelector('#anonymous-project-option').hidden = !project;
+  if (!project) anonymousProject.checked = false;
+  subject.textContent = '正在评价：' + [company, anonymousProject.checked ? '匿名项目' : project].filter(Boolean).join(' · ');
+  subject.hidden = !company && !project;
 }
 
 function fillFields(values) {
@@ -184,6 +209,8 @@ function saveDraft() {
       savedAt: Date.now(),
       submissionId: document.querySelector('#submissionId').value,
       values: readFields(),
+      entryCompany, entryProject,
+      anonymousProject: anonymousProject.checked,
     }));
   } catch {
     // 本地存储不可用时静默跳过
@@ -200,13 +227,19 @@ function restoreDraft() {
   try {
     draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
   } catch {
-    draft = null;
+    return;
   }
   if (!draft || !draft.savedAt || Date.now() - draft.savedAt > DRAFT_TTL) {
     localStorage.removeItem(DRAFT_KEY);
     return;
   }
-  fillFields(draft.values || {});
+  const values = draft.values || {};
+  // A link to another company or project must never inherit the previous review's text or receipt.
+  if (entryCompany || entryProject) {
+    if ((draft.entryCompany ?? values.company) !== entryCompany || (draft.entryProject ?? values.project ?? '') !== entryProject) return;
+  }
+  fillFields(values);
+  anonymousProject.checked = Boolean(draft.anonymousProject);
   if (draft.submissionId) document.querySelector('#submissionId').value = draft.submissionId;
   draftNote.hidden = false;
   startedAt = Date.now();
@@ -219,23 +252,8 @@ function buildText() {
     values.project ? `项目：${values.project}` : '',
     `评分：${values.score || '未填'}`,
     `评价：${values.comment}`,
-    values.wish ? `希望被吐槽：${values.wish}` : '',
-    values.role ? `岗位：${values.role}` : '',
-    values.tenure ? `司龄：${values.tenure}` : '',
-    values.employment ? `状态：${values.employment}` : '',
-    values.city ? `城市：${values.city}` : '',
+    values.tenure ? `在职时长：${form.elements.namedItem('tenure').selectedOptions[0].textContent}` : '',
   ].filter(Boolean).join('\n');
-}
-
-function updateMailLink() {
-  const email = document.body.dataset.fallbackEmail || '';
-  if (!email) {
-    mailLink.hidden = true;
-    return;
-  }
-  const subject = encodeURIComponent('游戏行业匿名评价提交');
-  mailLink.hidden = false;
-  mailLink.href = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(buildText())}`;
 }
 
 async function post(payload, timeout) {
@@ -284,25 +302,31 @@ function showSuccess(submissionId) {
   fallbackPanel.hidden = true;
   successPanel.hidden = false;
   receiptEl.textContent = submissionId;
+  const slug = companySlugs.get(form.elements.namedItem('companyId').value);
+  companyReturn.href = new URL(slug ? 'company/' + encodeURIComponent(slug) + '/' : 'companies/', siteBase).href;
+  companyReturn.textContent = slug ? '查看公司主页' : '查看公司目录';
+  clearTimeout(saveTimer);
   try { localStorage.removeItem(DRAFT_KEY); } catch { /* 忽略 */ }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  successPanel.querySelector('h2').focus();
 }
 
 function showFallback(message) {
   clearTimers();
   setBusy(false);
   saveDraft();
-  updateMailLink();
   fallbackPanel.hidden = false;
   setStatus('');
   setFallbackStatus(message || '内容已保存到本机。');
-  fallbackPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  fallbackPanel.scrollIntoView({ block: 'nearest' });
 }
 
 form.addEventListener('input', scheduleSave);
 form.addEventListener('change', scheduleSave);
 form.elements.namedItem('company')?.addEventListener('input', syncCompanyId);
 form.elements.namedItem('company')?.addEventListener('change', syncCompanyId);
+for (const name of ['company', 'project', 'anonymousProject']) {
+  form.elements.namedItem(name).addEventListener('input', updateSubject);
+}
 
 form.addEventListener('submit', async event => {
   event.preventDefault();
@@ -339,8 +363,8 @@ form.addEventListener('submit', async event => {
   }, 3000);
 
   try {
-    await attempt(payload);
-    showSuccess(payload.submissionId);
+    const result = await attempt(payload);
+    showSuccess(result.receipt || payload.submissionId);
     return;
   } catch (error) {
     if (error.status === 429) {
@@ -369,8 +393,8 @@ form.addEventListener('submit', async event => {
   }
 
   try {
-    await attempt(payload);
-    showSuccess(payload.submissionId);
+    const result = await attempt(payload);
+    showSuccess(result.receipt || payload.submissionId);
   } catch (error) {
     if (error.status === 429) {
       clearTimers();
@@ -392,6 +416,8 @@ cancelButton.addEventListener('click', () => showFallback('已取消等待，内
 
 againButton.addEventListener('click', () => {
   form.reset();
+  updateSubject();
+  draftNote.hidden = true;
   form.hidden = false;
   successPanel.hidden = true;
   document.querySelector('#submissionId').value = '';
@@ -424,6 +450,9 @@ deleteButton.addEventListener('click', () => {
   setStatus('本地副本已删除。');
 });
 
+// Without the script, native form submission omits the disabled project field.
+form.elements.namedItem('project').disabled = false;
+fillFields({ company: entryCompany, project: entryProject });
 restoreDraft();
-updateMailLink();
+updateSubject();
 loadCompanyCatalog();

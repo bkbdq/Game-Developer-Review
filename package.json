@@ -3,6 +3,7 @@
   "private": true,
   "workspaces": ["site"],
   "scripts": {
+    "dev:survey": "node tools/survey-preview.mjs",
     "data:validate": "node scripts/validate.mjs",
     "data:build": "node scripts/aggregate.mjs",
     "data:build:dev": "node scripts/aggregate.mjs --test",

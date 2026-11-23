@@ -1,0 +1,9 @@
+---
+import InfoPage from '../components/InfoPage.astro';
+import {href} from '../lib/data';
+---
+<InfoPage title="关于 goodcorp">
+  <section><h2>游戏团队里的工作体验</h2><p>在这里，你可以按公司或项目阅读开发者的亲身经历，也可以匿名写下自己的体验，帮助后来者了解一个团队。</p></section>
+  <section><h2>评价如何展示</h2><p>公司使用真实名称。写评价时可以只评价公司。平台定期人工审核，检查个人信息、未公开的项目细节和与工作经历无关的内容。评价反映作者个人观点。</p></section>
+  <section><h2>有疑问或异议</h2><p>可以通过<a href={href('contact/')}>联系我们</a>说明情况。查看<a href={href('privacy/')}>隐私说明</a>了解展示规则和作者申请更正的方式。</p></section>
+</InfoPage>

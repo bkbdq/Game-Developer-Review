@@ -3,12 +3,13 @@ import { recentPicks, projects } from '../lib/projects';
 import { href } from '../lib/data';
 import ProjectCover from './ProjectCover.astro';
 import ProjectStatus from './ProjectStatus.astro';
+import CompanyRatingLink from './CompanyRatingLink.astro';
 const slides = (recentPicks.length ? recentPicks : projects).slice(0,10);
 const loops = slides.length > 1;
 // Two cards at either end keep both previews visible while wrapping around.
 const track = loops ? [...slides.slice(-2), ...slides, ...slides.slice(0,2)] : slides;
 const start = loops ? 2 : 0;
-const title = recentPicks.length ? '精选评价' : '项目聚焦';
+const title = recentPicks.length ? '最近收到好评的项目' : '项目聚焦';
 ---
 {slides.length>0 && <section class="featured" data-featured aria-label={title}>
   <div class="discovery-section-head"><h2><i aria-hidden="true"></i>{title}</h2>
@@ -20,7 +21,7 @@ const title = recentPicks.length ? '精选评价' : '项目聚焦';
       inert={i!==start} aria-current={i===start ? 'true' : undefined}>
       <a class="hero-cover" href={p.path} aria-label={'查看'+p.name+'的全部评价'}><ProjectCover project={p} eager={i===start}/></a>
       <div class="feature-info">
-        <a class="studio-link" href={href('company/'+p.slug+'/')}>{p.company} ↗</a>
+        <CompanyRatingLink project={p}/>
         <h3><a href={p.path}>{p.name}</a></h3>
         <div class="feature-excerpts" aria-label="项目评价摘录">
           {p.featuredReview ? <blockquote><p>{p.featuredReview.comment}</p></blockquote> : <p>暂无公开评价</p>}

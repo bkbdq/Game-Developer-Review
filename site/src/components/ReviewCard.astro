@@ -1,13 +1,12 @@
 ---
 import { taxonomy, label, month, type Review } from '../lib/data';
-interface Props { review: Review; projectName?: string; verdict?: boolean }
-const {review:r,projectName,verdict=false}=Astro.props;
-const meta = [projectName, label(taxonomy.tenures, r.profile?.tenure)].filter(Boolean).join(' · ');
+interface Props { review: Review; projectName?: string; projectFilter?: string; showTenure?: boolean }
+const {review:r,projectName,projectFilter,showTenure=false}=Astro.props;
+const meta = [projectName, showTenure && label(taxonomy.tenures, r.profile?.tenure)].filter(Boolean).join(' · ');
 ---
-<article class="panel review" data-project={r.projectId || ''} data-tenure={r.profile?.tenure || ''}>
-  <div class="review-line"><span class="review-score">{verdict ? (r.score>=4?'好评':r.score===3?'中评':'差评') : '★'} · {r.score} 星</span><time datetime={r.publishedAt.slice(0,7)}>{month(r.publishedAt)}</time></div>
+<article class="panel review" data-project={projectFilter}>
+  <div class="review-line"><span class="review-score"><span aria-hidden="true">★</span> {r.score} 星</span><time datetime={r.publishedAt.slice(0,7)}>{month(r.publishedAt)}</time></div>
   {r.title && <h3>{r.title}</h3>}
   {r.comment.length>140 ? <details><summary><span class="excerpt">{r.comment.slice(0,120)}… <em>展开全文</em></span><em class="collapse">收起全文</em></summary><p>{r.comment}</p></details> : <p>{r.comment}</p>}
   {meta && <div class="review-meta">{meta}</div>}
-  {!!r.tags?.length && <div class="chips">{r.tags.map(t=><span>{label(taxonomy.tags,t)}</span>)}</div>}
 </article>

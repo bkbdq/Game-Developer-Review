@@ -2,6 +2,7 @@ node_modules/
 .astro/
 dist/
 site/public/data/
+site/src/generated/
 Game-Developer-Review/
 
 # 本地密钥，禁止提交
@@ -11,3 +12,5 @@ Game-Developer-Review/
 .secrets/
 .dev.vars
 .wrangler/
+.backups/
+.deploy-tmp/

@@ -1,9 +1,9 @@
 ---
 import { projects } from '../lib/projects';
-import { index, href, detail } from '../lib/data';
+import { index, href, companyAliases } from '../lib/data';
 const entries = [
   ...projects.map(p=>({name:p.name, info:p.company+' · '+p.count+' 篇评价', url:p.path, search:p.search, kind:'项目'})),
-  ...index.companies.map(c=>({name:c.name,info:'全部 '+c.reviewCount+' 篇公司评价',url:href('company/'+c.slug+'/'),search:[c.name,c.slug,...(c.aliases??detail(c.id).company.aliases??[])].join(' ').normalize('NFKC').toLowerCase(),kind:'公司'})),
+  ...index.companies.map(c=>({name:c.name,info:'全部 '+c.reviewCount+' 篇公司评价',url:href('company/'+c.slug+'/'),search:[c.name,c.slug,...companyAliases(c.id)].join(' ').normalize('NFKC').toLowerCase(),kind:'公司'})),
 ];
 ---
 <div class="project-search" data-project-search>

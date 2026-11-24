@@ -26,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SITE_BASE: /
+      PUBLIC_REVIEW_REQUEST_ENDPOINT: https://goodcorp.games/api/requests
+      PUBLIC_CONTACT_ENDPOINT: https://goodcorp.games/api/contact
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

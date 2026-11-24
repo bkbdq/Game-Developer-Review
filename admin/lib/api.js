@@ -35,12 +35,25 @@ export function createApi(token, base = DEFAULT_BASE) {
 
   return {
     me: () => request('/me'),
-    listPending: (limit = 50) => request(`/submissions?status=pending&limit=${encodeURIComponent(limit)}`),
+    summary: () => request('/summary'),
+    listPending: (limit = 50, offset = 0) => request(
+      `/submissions?status=pending&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`,
+    ),
     approve: (id, payload) => request(`/submissions/${encodeURIComponent(id)}`, {
       method: 'POST', body: { action: 'approve', ...payload },
     }),
     reject: (id, payload) => request(`/submissions/${encodeURIComponent(id)}`, {
       method: 'POST', body: { action: 'reject', ...payload },
+    }),
+    listRequests: (status = 'received', type = '') => request(
+      `/requests?status=${encodeURIComponent(status)}${type ? `&type=${encodeURIComponent(type)}` : ''}`,
+    ),
+    processRequest: (id, payload) => request(`/requests/${encodeURIComponent(id)}`, {
+      method: 'POST', body: payload,
+    }),
+    listContacts: (status = 'received') => request(`/contacts?status=${encodeURIComponent(status)}`),
+    handleContact: (id, payload = {}) => request(`/contacts/${encodeURIComponent(id)}`, {
+      method: 'POST', body: { action: 'handle', ...payload },
     }),
   };
 }

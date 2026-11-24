@@ -2,4 +2,69 @@
 import InfoPage from '../components/InfoPage.astro';
 import MessageForm from '../components/MessageForm.astro';
 ---
-<InfoPage title="申请删除或更正"><MessageForm author /></InfoPage>
+<InfoPage title="申请删除或更正">
+  <MessageForm author />
+  <section>
+    <h2>查询处理状态</h2>
+    <p>输入提交申请时使用的回执编号，可以查看已提交申请的处理结果。</p>
+    <form id="status-form" class="status-form">
+      <label>回执编号<input id="status-receipt" autocomplete="off" required /></label>
+      <button type="submit">查询</button>
+    </form>
+    <p id="status-result" class="status-result" role="status"></p>
+  </section>
+</InfoPage>
+<script>
+  const form = document.querySelector<HTMLFormElement>('#status-form');
+  const input = document.querySelector<HTMLInputElement>('#status-receipt');
+  const result = document.querySelector<HTMLElement>('#status-result');
+  const labels: Record<string, string> = {
+    received: '已收到',
+    processed: '已处理',
+    rejected: '未通过',
+    deletion: '删除',
+    correction: '更正',
+  };
+  form?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const receipt = input?.value.trim() || '';
+    if (!receipt) { if (result) result.textContent = '请填写回执编号。'; return; }
+    if (result) result.textContent = '正在查询…';
+    try {
+      const response = await fetch(`/api/requests?receipt=${encodeURIComponent(receipt)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok !== true) throw new Error(data.message || '查询失败');
+      if (!Array.isArray(data.requests) || !data.requests.length) {
+        if (result) result.textContent = '没有找到该回执的申请记录。';
+        return;
+      }
+      if (result) {
+        result.replaceChildren(...data.requests.map((item: Record<string, string>) => {
+          const line = document.createElement('p');
+          line.textContent = `${labels[item.type] || item.type} · ${labels[item.status] || item.status}` +
+            ` · 提交于 ${String(item.createdAt || '').slice(0, 10)}` +
+            (item.processedAt ? ` · 处理于 ${String(item.processedAt).slice(0, 10)}` : '') +
+            (item.resultNote ? ` · ${item.resultNote}` : '');
+          return line;
+        }));
+      }
+    } catch (error) {
+      if (result) result.textContent = error instanceof Error ? error.message : '查询失败';
+    }
+  });
+</script>
+<style>
+  .status-form { display: grid; gap: 12px; margin: 18px 0; }
+  .status-form label { display: grid; gap: 4px; }
+  .status-form input {
+    width: 100%; padding: 10px; border: 1px solid #546c7a; background: #142936;
+    color: inherit; border-radius: 3px; font: inherit;
+  }
+  .status-form button {
+    justify-self: start; min-height: 44px; background: #9ae1e3; color: #122b38;
+    border: 0; padding: 0 18px; border-radius: 4px; font-weight: 700;
+  }
+  .status-result:empty { display: none; }
+</style>

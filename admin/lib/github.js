@@ -24,6 +24,15 @@ export function decodeBase64(value) {
   return new TextDecoder().decode(Uint8Array.from(binary, char => char.charCodeAt(0)));
 }
 
+export function encodeBase64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return btoa(binary);
+}
+
 export function createClient(token, fetchImpl = fetch) {
   if (!token) throw new Error('缺少 GitHub token');
 
@@ -74,5 +83,13 @@ export function createClient(token, fetchImpl = fetch) {
     patchRef: (owner, repo, branch, sha) => request(`/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, {
       method: 'PATCH', body: { sha, force: false },
     }),
+    putFile: (owner, repo, path, { message, content, sha, branch }) => request(
+      `/repos/${owner}/${repo}/contents/${encodePath(path)}`,
+      { method: 'PUT', body: { message, content: encodeBase64(content), branch, ...(sha ? { sha } : {}) } },
+    ),
+    deleteFile: (owner, repo, path, { message, sha, branch }) => request(
+      `/repos/${owner}/${repo}/contents/${encodePath(path)}`,
+      { method: 'DELETE', body: { message, sha, branch } },
+    ),
   };
 }

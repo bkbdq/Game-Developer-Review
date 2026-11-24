@@ -13,7 +13,6 @@ export async function onRequestGet() {
         id: company.id,
         name: company.name,
         slug: company.slug,
-        aliases: Array.isArray(company.aliases) ? company.aliases : [],
       }))
       : [];
     return new Response(JSON.stringify({ companies }), { headers: JSON_HEADERS });

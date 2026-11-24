@@ -103,6 +103,8 @@ nav { display: flex; align-items: stretch; }
 .filters label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
 .filters select { border: 1px solid var(--line); border-radius: 6px; padding: 7px 5px; background: #fff; }
 .review-line { justify-content: space-between; font-size: 12px; color: var(--muted); }
+.review-stamp { display: inline-flex; align-items: center; gap: 8px; }
+.review-revised { font-style: normal; font-size: 11px; padding: 3px 6px; border-radius: 5px; background: #efe4c8; color: #7a5b17; }
 .review-score { background: #f1edfc; padding: 4px 7px; color: #624e9f; border-radius: 5px; }
 .review h3 { margin-top: 12px; font-size: 18px; }
 .review p, .review details { color: #464858; line-height: 1.85; font-size: 15px; margin-top: 8px; white-space: pre-line; overflow-wrap: anywhere; }

@@ -8,6 +8,7 @@ const againButton = document.querySelector('#again-button');
 const fallbackPanel = document.querySelector('#fallback-panel');
 const fallbackStatus = document.querySelector('#fallback-status');
 const copyButton = document.querySelector('#copy-button');
+const mailButton = document.querySelector('#mail-button');
 const retryButton = document.querySelector('#retry-button');
 const deleteButton = document.querySelector('#delete-button');
 const companyReturn = document.querySelector('#company-return');
@@ -21,6 +22,8 @@ document.querySelectorAll('[data-site-path]').forEach(link => {
 });
 const draftNote = document.querySelector('#draft-note');
 const companyList = document.querySelector('#company-options');
+// 兜底收件邮箱留空时不显示「邮件提交」
+const fallbackEmail = (form.dataset.fallbackEmail || '').trim();
 
 const FIELDS = ['company', 'companyId', 'project', 'score', 'tenure', 'comment'];
 const query = new URLSearchParams(location.search);
@@ -82,9 +85,30 @@ async function sha256Hex(text) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function solvePow() {
-  const challenge = randomHex(16);
-  const prefix = '0'.repeat(POW_DIFFICULTY);
+async function fetchChallenge() {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 3000);
+  try {
+    const response = await fetch('/api/challenge', {
+      signal: abort.signal,
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data?.challenge) return null;
+    return {
+      challenge: String(data.challenge),
+      difficulty: Number(data.difficulty) || POW_DIFFICULTY,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function solvePow(challenge, difficulty) {
+  const prefix = '0'.repeat(difficulty);
   let nonce = 0;
   while (true) {
     if ((await sha256Hex(`${challenge}:${nonce}`)).startsWith(prefix)) {
@@ -314,6 +338,10 @@ function showFallback(message) {
   clearTimers();
   setBusy(false);
   saveDraft();
+  if (fallbackEmail) {
+    mailButton.hidden = false;
+    mailButton.href = `mailto:${fallbackEmail}?subject=${encodeURIComponent('匿名评价提交')}&body=${encodeURIComponent(buildText())}`;
+  }
   fallbackPanel.hidden = false;
   setStatus('');
   setFallbackStatus(message || '内容已保存到本机。');
@@ -343,7 +371,8 @@ form.addEventListener('submit', async event => {
   setStatus('正在准备校验…');
   let pow;
   try {
-    pow = await solvePow();
+    const remote = await fetchChallenge();
+    pow = await solvePow(remote?.challenge || randomHex(16), remote?.difficulty || POW_DIFFICULTY);
   } catch {
     setStatus('浏览器无法完成本地校验，请换一个浏览器或稍后重试。', true);
     setBusy(false);

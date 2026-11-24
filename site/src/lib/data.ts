@@ -1,21 +1,22 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import type { ReviewFile, TaxonomyFile } from './schema-types';
+import aliasesByCompany from '../generated/aliases.json';
 
-export interface Entry { key: string; label: string }
+export type Entry = TaxonomyFile['roles'][number];
 export type ProfileKey = 'role' | 'tenure' | 'employment' | 'city';
-export type Taxonomy = Record<'roles' | 'tenures' | 'employments' | 'cities' | 'tags', Entry[]>;
+export type Taxonomy = TaxonomyFile;
 export interface Company {
-  id: string; slug: string; name: string; aliases?: string[];
+  id: string; slug: string; name: string;
   reviewCount: number; avgScore: number | null; scoreDistribution: Record<string, number>;
 }
 export interface Summary extends Company {
   projectCount: number; medianScore: number | null; lastPublishedAt: string | null;
   topTags: { key: string; count: number }[];
 }
-export interface Review {
-  id: string; projectId?: string; score: number; title?: string; comment: string;
-  profile?: Partial<Record<ProfileKey, string>>; tags?: string[]; publishedAt: string;
-}
+export type Review = Pick<ReviewFile,
+  'id' | 'projectId' | 'score' | 'title' | 'comment' | 'profile' | 'tags' | 'publishedAt' | 'revision'
+>;
 export interface Detail {
   company: Company;
   projects: { id: string; name: string; status: string; featuredReviewId?: string; reviewCount: number; avgScore: number | null }[];
@@ -41,6 +42,7 @@ export function detail(id: string) {
   return read<Detail>('companies/' + id);
 }
 export const href = (path = '') => import.meta.env.BASE_URL.replace(/\/?$/, '/') + path;
+export const companyAliases = (id: string) => (aliasesByCompany as Record<string, string[]>)[id] ?? [];
 export const scoreText = (score: number | null) => score == null ? '—' : score.toFixed(1);
 export const label = (items: Entry[], key?: string) => items.find(item => item.key === key)?.label ?? key;
 export const month = (date?: string | null) => date ? date.slice(0, 7).replace('-', '.') : '—';

@@ -8,6 +8,7 @@ import {
   dedupeHash,
   sha256Hex,
 } from '../functions/_lib/core.js';
+import { issueChallenge, verifyChallenge } from '../functions/_lib/pow.js';
 
 const submissionId = '4d0f3f0e-8a3d-4b2f-9c1e-7f6a5b4c3d2e';
 const base = {
@@ -64,6 +65,11 @@ assert.ok(honeypot.flags.includes('suspected'));
 const native = validate(normalize({ ...base, js: '' }));
 assert.ok(native.flags.includes('no_js'));
 
+const hiddenProject = normalize({ ...base, project: '星港', anonymousProject: 'on' });
+assert.equal(hiddenProject.projectHidden, true);
+assert.equal(hiddenProject.project, '');
+assert.equal(validate(hiddenProject).ok, true);
+
 const json = parseSubmissionBody(JSON.stringify({ company: 'A' }), 'application/json');
 assert.equal(json.data.company, 'A');
 const form = parseSubmissionBody('company=B&score=3', 'application/x-www-form-urlencoded');
@@ -78,5 +84,15 @@ assert.equal(await verifyPow('challenge', String(nonce), 2), true);
 assert.equal((await hashIp('1.2.3.4', 'salt')).length, 16);
 assert.equal((await dedupeHash(input)).length, 32);
 assert.equal(await sha256Hex('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+
+const issued = await issueChallenge({ secret: 'test-secret', difficulty: 2 });
+assert.match(issued.challenge, /^v1\./);
+assert.equal(issued.difficulty, 2);
+const verified = await verifyChallenge(issued.challenge, 'test-secret');
+assert.equal(verified.ok, true);
+assert.equal(verified.payload.d, 2);
+assert.equal((await verifyChallenge(issued.challenge, 'wrong-secret')).ok, false);
+const expired = await issueChallenge({ secret: 'test-secret', ttlMs: -1000 });
+assert.equal((await verifyChallenge(expired.challenge, 'test-secret')).ok, false);
 
 console.log('M2 校验与 PoW 测试通过');

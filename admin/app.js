@@ -43,7 +43,14 @@ const refreshButton = $('#refresh-button');
 const deployButton = $('#deploy-button');
 const localMode = ['127.0.0.1', 'localhost', '::1'].includes(location.hostname);
 const pendingList = $('#pending-list');
+const loadMoreButton = $('#load-more');
 const pendingCount = $('#pending-count');
+const overviewPending = $('#overview-pending');
+const overviewRequests = $('#overview-requests');
+const overviewContacts = $('#overview-contacts');
+const countPending = $('#count-pending');
+const countRequests = $('#count-requests');
+const countContacts = $('#count-contacts');
 const tabPending = $('#tab-pending');
 const tabStaged = $('#tab-staged');
 const stagedBar = $('#staged-bar');
@@ -102,6 +109,7 @@ const state = {
   aliasIndex: new Map(),
   pending: [],
   pendingTotal: 0,
+  counts: { pending: 0, requests: 0, contacts: 0 },
   staging: loadStaging(),
   tab: 'pending',
   selected: null,
@@ -118,6 +126,45 @@ const state = {
 function setStatus(element, message, isError = false) {
   element.textContent = message || '';
   element.classList.toggle('error', Boolean(isError));
+}
+
+function renderOverview() {
+  countPending.textContent = String(state.counts.pending);
+  countRequests.textContent = String(state.counts.requests);
+  countContacts.textContent = String(state.counts.contacts);
+  overviewPending.classList.toggle('has-items', state.counts.pending > 0);
+  overviewRequests.classList.toggle('has-items', state.counts.requests > 0);
+  overviewContacts.classList.toggle('has-items', state.counts.contacts > 0);
+}
+
+async function refreshOverview() {
+  if (!state.api || state.busy) return;
+  try {
+    const summary = await state.api.summary();
+    state.counts = {
+      pending: summary.pending || 0,
+      requests: summary.requests || 0,
+      contacts: summary.contacts || 0,
+    };
+    renderOverview();
+  } catch {
+    // 总览轮询失败不打断审核流程，下一次刷新或操作会再试
+  }
+}
+
+const OVERVIEW_POLL_MS = 30000;
+let overviewTimer = null;
+
+function startOverviewPolling() {
+  stopOverviewPolling();
+  overviewTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') refreshOverview();
+  }, OVERVIEW_POLL_MS);
+}
+
+function stopOverviewPolling() {
+  if (overviewTimer) clearInterval(overviewTimer);
+  overviewTimer = null;
 }
 
 function describeError(error) {
@@ -174,6 +221,12 @@ function projectName(review, company) {
   return (company.projects || []).find(project => project.id === review.projectId)?.name || '';
 }
 
+function waitedDays(value) {
+  const time = Date.parse(value || '');
+  if (!Number.isFinite(time)) return -1;
+  return Math.max(0, Math.floor((Date.now() - time) / 86_400_000));
+}
+
 function renderList() {
   const query = filterInput.value.trim().toLowerCase();
   const staged = state.tab === 'staged';
@@ -215,6 +268,7 @@ function renderList() {
     });
   } else {
     items.forEach(item => {
+      const waited = waitedDays(item.raw?.submittedAt || item.view?.submittedAt);
       pendingList.append(h('button', {
         type: 'button',
         class: 'item' + (item.id === state.selectedId ? ' active' : ''),
@@ -223,7 +277,8 @@ function renderList() {
         h('div', { class: 'item-head' },
           h('strong', {}, item.view.company || '（未填公司）'),
           h('span', {}, `${item.view.score} 分`)),
-        h('div', { class: 'item-meta' }, [item.view.project, (item.raw.submittedAt || '').slice(0, 10)].filter(Boolean).join(' · ')),
+        h('div', { class: `item-meta${waited >= 7 ? ' warn' : ''}` },
+          [item.view.project, (item.raw.submittedAt || '').slice(0, 10), waited >= 0 ? `已等待 ${waited} 天` : ''].filter(Boolean).join(' · ')),
         item.view.flags.length ? h('div', { class: 'flags' }, item.view.flags.join(' · ')) : null,
       ));
     });
@@ -233,6 +288,8 @@ function renderList() {
     ? `暂存 ${state.staging.length} 条`
     : (totalPending > visiblePending.length ? `显示 ${visiblePending.length} / 共 ${totalPending} 条` : `共 ${visiblePending.length} 条`);
   publishBatchButton.disabled = state.busy || !state.staging.length;
+  loadMoreButton.hidden = staged || state.pending.length >= state.pendingTotal;
+  loadMoreButton.disabled = state.busy;
 }
 
 function setTab(tab) {
@@ -600,6 +657,7 @@ function setBusy(busy) {
   state.busy = busy;
   rejectButton.disabled = busy;
   publishBatchButton.disabled = busy || !state.staging.length;
+  loadMoreButton.disabled = busy;
   refreshGate();
 }
 
@@ -737,11 +795,12 @@ async function loadData() {
   const { client, api } = state;
   setStatus(globalStatus, '正在加载数据…');
 
-  const [taxonomyFile, companyTree, pendingResult] = await Promise.all([
+  const [taxonomyFile, companyTree, pendingResult, , summary] = await Promise.all([
     client.getFile(config.owner, config.publicRepo, config.taxonomyPath, config.publicBranch),
     client.getTree(config.owner, config.publicRepo, config.publicBranch),
-    api.listPending(config.maxPending),
+    api.listPending(config.maxPending, 0),
     loadAliases(),
+    api.summary(),
   ]);
   if (!taxonomyFile) throw new Error('公开仓缺少 taxonomy.json');
 
@@ -778,11 +837,42 @@ async function loadData() {
     .filter(Boolean)
     .sort((a, b) => (b.raw.submittedAt || '').localeCompare(a.raw.submittedAt || ''));
   state.pendingTotal = pendingResult.total || 0;
+  state.counts = {
+    pending: state.pendingTotal,
+    requests: summary.requests || 0,
+    contacts: summary.contacts || 0,
+  };
+  renderOverview();
   state.selected = null;
   state.selectedId = null;
   state.reviewId = null;
   showEmptyDetail();
   renderList();
+}
+
+async function loadMore() {
+  if (state.busy || state.pending.length >= state.pendingTotal) return;
+  setBusy(true);
+  setStatus(globalStatus, '正在加载更多…');
+  try {
+    const result = await state.api.listPending(config.maxPending, state.pending.length);
+    const existing = new Set(state.pending.map(item => item.id));
+    const extra = (result.items || [])
+      .map(item => {
+        const view = parseSubmission(item.submission);
+        return view ? { id: item.id, raw: item.submission, view } : null;
+      })
+      .filter(item => item && !existing.has(item.id));
+    state.pending = [...state.pending, ...extra]
+      .sort((a, b) => (b.raw.submittedAt || '').localeCompare(a.raw.submittedAt || ''));
+    state.pendingTotal = result.total || state.pendingTotal;
+    renderList();
+    setStatus(globalStatus, '');
+  } catch (error) {
+    setStatus(globalStatus, describeError(error), true);
+  } finally {
+    setBusy(false);
+  }
 }
 
 async function signIn(token, { silent = false } = {}) {
@@ -796,6 +886,7 @@ async function signIn(token, { silent = false } = {}) {
     state.client = client;
     state.api = api;
     await loadData();
+    startOverviewPolling();
 
     loginView.hidden = true;
     appView.hidden = false;
@@ -812,11 +903,14 @@ async function signIn(token, { silent = false } = {}) {
 }
 
 function signOut(message = '') {
+  stopOverviewPolling();
   sessionStorage.removeItem(TOKEN_KEY);
   state.client = null;
   state.api = null;
   state.pending = [];
   state.pendingTotal = 0;
+  state.counts = { pending: 0, requests: 0, contacts: 0 };
+  renderOverview();
   state.companies = new Map();
   state.aliasIndex = new Map();
   state.selected = null;
@@ -953,6 +1047,8 @@ async function publishStaged() {
     const removed = state.pending.filter(item => approved.has(item.id)).length;
     state.pending = state.pending.filter(item => !approved.has(item.id));
     state.pendingTotal = Math.max(0, state.pendingTotal - removed);
+    state.counts.pending = state.pendingTotal;
+    renderOverview();
     if (!state.staging.length) state.tab = 'pending';
 
     let deployNote = '';
@@ -1008,6 +1104,8 @@ async function handleApprove(event) {
 
     state.pending = state.pending.filter(entry => entry.id !== item.id);
     state.pendingTotal = Math.max(0, state.pendingTotal - 1);
+    state.counts.pending = state.pendingTotal;
+    renderOverview();
     showEmptyDetail();
     setStatus(globalStatus, `已发布 ${review.id} → ${review.companyId}${deployNote}`);
   } catch (error) {
@@ -1048,6 +1146,8 @@ async function handleRejectConfirm() {
     await state.api.reject(item.id, { reason: finalReason });
     state.pending = state.pending.filter(entry => entry.id !== item.id);
     state.pendingTotal = Math.max(0, state.pendingTotal - 1);
+    state.counts.pending = state.pendingTotal;
+    renderOverview();
     resetRejectPanel();
     showEmptyDetail();
     setStatus(globalStatus, `已拒绝 ${item.raw.submissionId}`);
@@ -1098,6 +1198,21 @@ refreshButton.addEventListener('click', async () => {
   } finally {
     refreshButton.disabled = false;
   }
+});
+loadMoreButton.addEventListener('click', loadMore);
+
+overviewPending.addEventListener('click', () => {
+  setTab('pending');
+  pendingList.scrollIntoView({ block: 'nearest' });
+  filterInput.focus();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshOverview();
+});
+window.addEventListener('focus', () => refreshOverview());
+window.addEventListener('pageshow', event => {
+  if (event.persisted) refreshOverview();
 });
 
 filterInput.addEventListener('input', renderList);

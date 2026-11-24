@@ -31,6 +31,18 @@ body {
 
 .brand { display: flex; gap: .8rem; align-items: baseline; }
 .brand span { color: var(--muted); font-size: .85rem; }
+.topbar-actions { display: flex; gap: .6rem; align-items: center; }
+.topbar-link {
+  padding: .45rem .8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: .9rem;
+}
+.topbar-link:hover { color: var(--ink); }
+.queue-field { margin: .35rem 0; }
+.queue-field strong { color: var(--muted); font-weight: 600; }
 
 main { max-width: 78rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
 
@@ -85,6 +97,36 @@ button.danger { background: var(--danger); }
   margin-bottom: 1rem;
 }
 
+.overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+.overview-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .1rem;
+  padding: .85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.overview-card:hover { border-color: var(--accent); }
+.overview-label { color: var(--muted); font-size: .85rem; font-weight: 600; }
+.overview-card strong { font-size: 1.6rem; line-height: 1.25; }
+.overview-card small { color: var(--muted); font-size: .78rem; }
+.overview-card.has-items { border-color: var(--accent); background: #eef7f1; }
+.overview-card.has-items strong { color: var(--accent); }
+
 .toolbar input { max-width: 22rem; }
 .count { color: var(--muted); font-size: .9rem; }
 
@@ -135,6 +177,7 @@ button.danger { background: var(--danger); }
 .list .item-head { display: flex; justify-content: space-between; gap: .5rem; }
 .list .item-head strong { font-size: .95rem; }
 .list .item-meta { color: var(--muted); font-size: .82rem; }
+.list .item-meta.warn { color: var(--warn); font-weight: 600; }
 .list .flags { color: var(--warn); font-size: .78rem; }
 
 .empty { color: var(--muted); padding: 2rem 0; text-align: center; }
@@ -262,6 +305,7 @@ legend { padding: 0 .35rem; color: var(--muted); font-size: .85rem; }
 .status.error { color: var(--danger); }
 
 @media (max-width: 780px) {
+  .overview { grid-template-columns: 1fr; }
   .layout { grid-template-columns: 1fr; }
   .list { max-height: 16rem; }
 }
@@ -281,4 +325,5 @@ legend { padding: 0 .35rem; color: var(--muted); font-size: .85rem; }
   .list button.item.active { background: #233a2e; }
   .tab.active { background: #233a2e; }
   .combo-item:hover, .combo-item.active { background: #233a2e; }
+  .overview-card.has-items { background: #233a2e; }
 }

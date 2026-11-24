@@ -113,7 +113,7 @@
 - [x] `gdr-survey`：配置 `POW_SECRET`、`POW_DIFFICULTY`，重新部署
 - [x] 清理 Worker：填入真实 `database_id`，执行 `npm run deploy:cleanup`，Cron 已生效
 - [x] 重新部署 `gdr-survey`、`gdr-site`、`gdr-admin`（另含 `gdr-site-dev`）
-- [x] 联调：问卷服务端 PoW、删除/更正申请、回执状态查询、联系消息、审核台队列
+- [x] 联调：问卷服务端 PoW、删除/更正申请、回执状态查询、联系消息；审核台队列 API 已部署（未带 token 时 401 正常，实际处理动作待用 PAT 登录实测）
 - [x] 执行一次 `npm run d1:export`，确认备份可用（`.backups/goodcompany-*.sql`）
 - [ ] `dev → main` 后验证 GitHub Pages 镜像表单调用 Cloudflare API 的完整链路（API 跨域已用 `Origin: https://github.goodcorp.games` 验证通过，镜像站本身待合并后重建）
 

@@ -88,6 +88,10 @@ function mockClient({ reviewExists = false } = {}) {
   const calls = [];
   return {
     calls,
+    async getTree() {
+      calls.push(['getTree']);
+      return { tree: reviewExists ? [{ type: 'blob', path: `data/reviews/c_cloudcape/${review.id}.json` }] : [] };
+    },
     async getFile(owner, repo, path) {
       calls.push(['getFile', repo, path]);
       return reviewExists ? { path, sha: 'sha', content: '{}' } : null;
@@ -120,7 +124,7 @@ assert.deepEqual(treeCall[1].tree.map(item => item.path).sort(), [
   'data/reviews/c_cloudcape/' + review.id + '.json',
 ]);
 const commitCall = client.calls.find(call => call[0] === 'createCommit');
-assert.ok(commitCall[1].message.includes('data: add review'));
+assert.ok(commitCall[1].message.includes('data: publish'));
 assert.ok(client.calls.some(call => call[0] === 'patchRef' && call[2] === 'new-commit'));
 assert.ok(!client.calls.some(call => call[0] === 'deleteFile'));
 

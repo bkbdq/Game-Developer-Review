@@ -64,6 +64,11 @@ assert.ok(honeypot.flags.includes('suspected'));
 const native = validate(normalize({ ...base, js: '' }));
 assert.ok(native.flags.includes('no_js'));
 
+const hiddenProject = normalize({ ...base, project: '星港', anonymousProject: 'on' });
+assert.equal(hiddenProject.projectHidden, true);
+assert.equal(hiddenProject.project, '');
+assert.equal(validate(hiddenProject).ok, true);
+
 const json = parseSubmissionBody(JSON.stringify({ company: 'A' }), 'application/json');
 assert.equal(json.data.company, 'A');
 const form = parseSubmissionBody('company=B&score=3', 'application/x-www-form-urlencoded');

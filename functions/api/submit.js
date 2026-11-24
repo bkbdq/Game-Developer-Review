@@ -109,6 +109,7 @@ export async function onRequestPost({ request, env }) {
       company: input.company,
       ...(input.companyId ? { companyId: input.companyId } : {}),
       project: input.project || undefined,
+      ...(input.projectHidden ? { projectHidden: true } : {}),
       score: input.score,
       comment: input.comment,
       wish: input.wish || undefined,

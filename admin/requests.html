@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'self'">
+  <title>申请 / 联系队列 · 审核控制台</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a class="topbar-link" href="/">← 审核台</a>
+      <strong>申请 / 联系队列</strong>
+      <span id="user-label"></span>
+    </div>
+    <button id="logout-button" type="button" class="ghost" hidden>退出</button>
+  </header>
+
+  <main>
+    <section id="login-view" class="panel login">
+      <h1>管理员登录</h1>
+      <p>使用与审核台相同的 GitHub PAT。token 只保存在当前标签页。</p>
+      <form id="login-form">
+        <label for="token">GitHub Token</label>
+        <input id="token" type="password" autocomplete="off" spellcheck="false" required>
+        <button type="submit">登录</button>
+      </form>
+      <p id="login-status" class="status" role="status"></p>
+    </section>
+
+    <section id="app-view" hidden>
+      <div class="toolbar">
+        <div class="tabs">
+          <button id="tab-requests" type="button" class="tab active">删除 / 更正</button>
+          <button id="tab-contacts" type="button" class="tab">联系消息</button>
+        </div>
+        <button id="refresh-button" type="button" class="ghost">刷新</button>
+        <span id="queue-count" class="count"></span>
+      </div>
+      <div class="layout">
+        <aside id="queue-list" class="panel list" aria-label="待处理队列"></aside>
+        <section id="queue-detail" class="panel detail">
+          <div class="empty">选择左侧一条记录</div>
+        </section>
+      </div>
+    </section>
+
+    <p id="global-status" class="status" role="status"></p>
+  </main>
+
+  <script type="module" src="/requests.js"></script>
+</body>
+</html>

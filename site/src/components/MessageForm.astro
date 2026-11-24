@@ -1,7 +1,9 @@
 ---
 import {href} from '../lib/data';
 const {author = false} = Astro.props;
-const endpoint = author ? import.meta.env.PUBLIC_REVIEW_REQUEST_ENDPOINT : import.meta.env.PUBLIC_CONTACT_ENDPOINT;
+const configured = author ? import.meta.env.PUBLIC_REVIEW_REQUEST_ENDPOINT : import.meta.env.PUBLIC_CONTACT_ENDPOINT;
+// 生产构建默认走同源 Functions；本地 astro dev 没有 Functions 时保持复制模式
+const endpoint = configured || (import.meta.env.PROD ? (author ? '/api/requests' : '/api/contact') : '');
 ---
 <p>{author ? '仅供评价作者使用。请填写提交时获得的回执和需要处理的内容。' : '请说明遇到的问题。涉及某家公司或评价时，可以附上页面链接。'}</p>
 {!endpoint && <p class="notice">此通道暂未开放。可以先整理并复制{author ? '申请' : '问题'}，开放后再提交。</p>}

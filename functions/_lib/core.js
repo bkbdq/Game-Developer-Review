@@ -48,11 +48,15 @@ export function normalize(raw = {}) {
   if (TENURES.includes(raw.tenure)) profile.tenure = raw.tenure;
   if (EMPLOYMENTS.includes(raw.employment)) profile.employment = raw.employment;
   if (CITIES.includes(raw.city)) profile.city = raw.city;
+  const project = cleanLine(raw.project);
+  // 问卷勾选「不公开项目名」时不再保存项目原文，只保留标记
+  const projectHidden = toBool(raw.anonymousProject ?? raw.projectHidden);
   return {
     submissionId: cleanLine(raw.submissionId),
     companyId: COMPANY_ID.test(cleanLine(raw.companyId)) ? cleanLine(raw.companyId) : '',
     company: cleanLine(raw.company),
-    project: cleanLine(raw.project),
+    project: projectHidden ? '' : project,
+    projectHidden,
     score: Number(raw.score),
     comment: cleanText(raw.comment),
     wish: cleanText(raw.wish),

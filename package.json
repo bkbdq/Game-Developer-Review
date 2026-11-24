@@ -9,6 +9,7 @@
     "data:build:dev": "node scripts/aggregate.mjs --test",
     "test:m2": "node scripts/test-m2.mjs",
     "test:m3": "node scripts/test-m3.mjs",
+    "test:m6": "node scripts/test-m6.mjs",
     "test:admin": "node scripts/test-admin-match.mjs",
     "test:admin-review": "node scripts/test-admin-review.mjs",
     "dev": "npm run data:build && npm run dev --workspace site",
@@ -18,6 +19,7 @@
     "deploy:site": "npm run build && cd site && npx --yes wrangler@4.165.0 pages deploy dist --project-name gdr-site --branch main --commit-dirty=true",
     "deploy:dev": "npm run build:dev && cd site && npx --yes wrangler@4.165.0 pages deploy dist --project-name gdr-site-dev --branch dev --commit-dirty=true",
     "deploy:survey": "npx --yes wrangler@4.165.0 pages deploy survey --project-name gdr-survey --branch main --commit-dirty=true",
-    "deploy:admin": "cd admin && npx --yes wrangler@4.165.0 pages deploy . --project-name gdr-admin --branch main --commit-dirty=true"
+    "deploy:admin": "cd admin && npx --yes wrangler@4.165.0 pages deploy . --project-name gdr-admin --branch main --commit-dirty=true",
+    "deploy:cleanup": "npx --yes wrangler@4.165.0 deploy -c worker/wrangler.toml"
   }
 }

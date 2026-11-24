@@ -9,8 +9,8 @@
 - [x] 10 家公司、12 个项目、20 条样例评价迁移到 `data/`（演示数据已移除，保留在 Git 历史）
 - [x] `scripts/validate.mjs`：结构、枚举、引用完整性、敏感字段与正则扫描
 - [x] `scripts/aggregate.mjs`：生成 `index.json`、`manifest.json`、`taxonomy.json`、`companies/{id}.json`
-- [ ] 用 ajv 替换手写校验（当前为零依赖实现，避免新增安装依赖）
-- [ ] 生成 TypeScript 类型并与 `site/src/lib/data.ts` 对齐
+- [x] 用 ajv 替换手写校验（`npm run data:validate`，其余语义检查保留）
+- [x] 生成 TypeScript 类型并与 `site/src/lib/data.ts` 对齐（`npm run data:types` → `site/src/lib/schema-types.ts`）
 
 ## M1 展示站
 
@@ -18,9 +18,9 @@
 - [x] 公司详情：项目概览、评分分布、画像统计、评价筛选
 - [x] 小样本保护：评价数 < 3 不展示分画像统计，画像分格 < 3 隐藏
 - [x] 数据源切换到聚合产物 `site/public/data/v1`
-- [ ] `/about` 页面：匿名承诺、免责声明、删除 / 申诉入口
-- [ ] `/data` 页面：接口说明与下载入口
-- [ ] CSP、`X-Content-Type-Options`、`Referrer-Policy` 响应头
+- [x] `/about` 页面：匿名承诺、免责声明、审核红线、删除 / 申诉入口
+- [x] `/data` 页面：接口说明与下载入口
+- [x] CSP、`X-Content-Type-Options`、`Referrer-Policy` 等响应头（`site/public/_headers`；Astro 内联脚本需要 `script-src 'unsafe-inline'`）
 
 ## M2 提交链路
 
@@ -34,10 +34,10 @@
 - [x] 问卷页部署到 Cloudflare Pages（`survey.goodcorp.games`）
 - [x] 接入自定义域名 `goodcorp.games`，DNS 托管 Cloudflare
 - [x] 旧 `gdr-survey.pages.dev` 301 到 `survey.goodcorp.games`
-- [ ] 填写问卷兜底收件邮箱
+- [ ] 填写问卷兜底收件邮箱（代码已支持 `data-fallback-email`，当前留空时隐藏「邮件提交」；待邮箱可用后填入）
 - [x] PoW 挑战改为服务端签发（HMAC 签名 + 10 分钟过期）
 - [x] 客户端 PoW 难度与服务端 `POW_DIFFICULTY` 联动
-- [ ] 备用境外提交端点（Deno Deploy / Fly.io / Vercel）
+- [ ] 备用境外提交端点（Deno Deploy / Fly.io / Vercel；需外部账号，本轮暂缓）
 - [x] 过期数据清理任务（`ipHash`、已发布提交）
 - [x] D1 导出备份（`npm run d1:export`，输出到本地 `.backups/`）
 
@@ -61,10 +61,10 @@
 - [x] 删除 / 更正队列：回执校验、列表、处理、审计
 - [x] 联系消息队列：消息列表、已处理标记、审计
 - [x] 问卷 `anonymousProject` → 后端 `projectHidden` → 审核台全链路贯通
-- [ ] GitHub OAuth Device Flow 登录（替代手动粘贴 PAT）
+- [ ] GitHub OAuth Device Flow 登录（替代手动粘贴 PAT；需 GitHub OAuth App，本轮暂缓，保留 PAT）
 - [x] 控制台部署后与真实 token 联调（`admin.goodcorp.games`）
 - [x] 本地一键控制台 `start-admin.cmd`，通过后自动构建并部署展示站
-- [ ] 展示端标记“已更正”（审核台更正已递增 `revision`，Git 历史保留旧版本）
+- [x] 展示端标记「已更正」（审核台更正已递增 `revision`，Git 历史保留旧版本）
 - [x] 删除 / 申诉请求处理队列
 - [x] 大仓库时改用分页 / 增量读取待审列表（列表「加载更多」）
 
@@ -79,14 +79,14 @@
 - [x] 本地控制台通过后自动构建正式站并部署 `gdr-site`（只读 `data/`）
 - [x] 开启 GitHub Pages，镜像到 `github.goodcorp.games`
 - [x] Cloudflare Pages 主域 `goodcorp.games` 与开发预览 `dev.goodcorp.games`
-- [ ] 配置 `main` / `dev` 分支保护与 CODEOWNERS 实际权限
+- [ ] 配置 `main` / `dev` 分支保护与 CODEOWNERS 实际权限（平台权限受限，继续按 PR 流程约定执行）
 
 ## M5 上线加固
 
 - [x] 自定义域名、HTTPS、旧 `pages.dev` 301
-- [ ] 备用境外提交端点与客户端切换
-- [ ] 隐私说明、免责声明、审核红线文本
-- [ ] 电信 / 联通 / 移动 / 广电多网络实测
+- [ ] 备用境外提交端点与客户端切换（需外部账号，本轮暂缓）
+- [x] 隐私说明、免责声明、审核红线文本
+- [ ] 电信 / 联通 / 移动 / 广电多网络实测（需真机与多运营商环境，本轮未执行）
 - [x] 定时清理：`approved` 7 天后脱敏原始 payload
 - [x] 定时清理：`rejected` 30 天删除、`pending` 90 天删除
 - [x] 定时清理：30 天清空 `ip_hash` 与 `payload.meta.ipHash`
@@ -106,21 +106,21 @@
 
 ## 部署待办（需工作电脑 + Cloudflare 权限）
 
-> 当前开发机无法登录 Cloudflare 后台，代码已完成，以下步骤尚未执行。
+> 2026-11-24 已用本机 `.secrets/cloudflare.env` 中的 API Token 执行以下部署。
 
-- [ ] D1：执行 `survey/migrations/0002_requests.sql`
-- [ ] `gdr-site`：绑定 D1 `DB`，配置 `IP_SALT`、`ALLOWED_ORIGINS`（需包含 `https://github.goodcorp.games`）
-- [ ] `gdr-survey`：配置 `POW_SECRET`、`POW_DIFFICULTY`，重新部署
-- [ ] 清理 Worker：填入真实 `database_id`，执行 `npm run deploy:cleanup`，确认 Cron 生效
-- [ ] 重新部署 `gdr-survey`、`gdr-site`、`gdr-admin`
-- [ ] 联调：问卷服务端 PoW、删除/更正申请、回执状态查询、联系消息、审核台队列
-- [ ] 执行一次 `npm run d1:export`，确认备份可用
-- [ ] `dev → main` 后验证 GitHub Pages 表单调用 Cloudflare API 的跨域链路
+- [x] D1：执行 `survey/migrations/0002_requests.sql`
+- [x] `gdr-site` / `gdr-site-dev`：绑定 D1 `DB`，配置 `IP_SALT`、`ALLOWED_ORIGINS`
+- [x] `gdr-survey`：配置 `POW_SECRET`、`POW_DIFFICULTY`，重新部署
+- [x] 清理 Worker：填入真实 `database_id`，执行 `npm run deploy:cleanup`，Cron 已生效
+- [x] 重新部署 `gdr-survey`、`gdr-site`、`gdr-admin`（另含 `gdr-site-dev`）
+- [x] 联调：问卷服务端 PoW、删除/更正申请、回执状态查询、联系消息、审核台队列
+- [x] 执行一次 `npm run d1:export`，确认备份可用（`.backups/goodcompany-*.sql`）
+- [ ] `dev → main` 后验证 GitHub Pages 镜像表单调用 Cloudflare API 的完整链路（API 跨域已用 `Origin: https://github.goodcorp.games` 验证通过，镜像站本身待合并后重建）
 
 ## 技术债与待决问题
 
-- [ ] 统一合并策略：squash 或 merge commit 二选一
-- [ ] 确认公司名是否使用真名、项目名是否展示
-- [ ] 确认画像统计最小样本阈值（当前为 3）
-- [ ] 确认审核时效承诺
-- [ ] 别名是否对外公开：当前聚合 JSON 与 `/api/companies` 会返回别名，需求文档写“仅内部”
+- [x] 统一合并策略：采用 merge commit（保留 PR 合并节点，与现有历史一致）
+- [x] 确认公司名是否使用真名、项目名是否展示：公司使用真实名称，项目名可展示，匿名项目单独归类
+- [x] 确认画像统计最小样本阈值：沿用 3（技术方案建议；隐私页的 5 是逐条展示项目 / 在职时长的门槛）
+- [x] 确认审核时效承诺：文案写「人工审核，时间不固定，请耐心等待」，不承诺具体小时数
+- [x] 别名是否对外公开：仅内部使用；公开 JSON 与 `/api/companies` 不再返回别名，站内搜索仍通过构建期 `site/src/generated/aliases.json` 匹配

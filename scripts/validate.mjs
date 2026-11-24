@@ -1,3 +1,4 @@
+// 校验入口：npm run data:validate（CI 中先执行 npm ci 安装 ajv）
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

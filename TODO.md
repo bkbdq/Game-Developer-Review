@@ -104,6 +104,19 @@
 - [x] 审计动作：`delete` / `correct` / `contact_handled`
 - [x] 保留期：联系方式 30 天、申请/联系记录处理完 90 天
 
+## 部署待办（需工作电脑 + Cloudflare 权限）
+
+> 当前开发机无法登录 Cloudflare 后台，代码已完成，以下步骤尚未执行。
+
+- [ ] D1：执行 `survey/migrations/0002_requests.sql`
+- [ ] `gdr-site`：绑定 D1 `DB`，配置 `IP_SALT`、`ALLOWED_ORIGINS`（需包含 `https://github.goodcorp.games`）
+- [ ] `gdr-survey`：配置 `POW_SECRET`、`POW_DIFFICULTY`，重新部署
+- [ ] 清理 Worker：填入真实 `database_id`，执行 `npm run deploy:cleanup`，确认 Cron 生效
+- [ ] 重新部署 `gdr-survey`、`gdr-site`、`gdr-admin`
+- [ ] 联调：问卷服务端 PoW、删除/更正申请、回执状态查询、联系消息、审核台队列
+- [ ] 执行一次 `npm run d1:export`，确认备份可用
+- [ ] `dev → main` 后验证 GitHub Pages 表单调用 Cloudflare API 的跨域链路
+
 ## 技术债与待决问题
 
 - [ ] 统一合并策略：squash 或 merge commit 二选一

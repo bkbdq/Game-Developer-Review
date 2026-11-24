@@ -43,6 +43,7 @@ const refreshButton = $('#refresh-button');
 const deployButton = $('#deploy-button');
 const localMode = ['127.0.0.1', 'localhost', '::1'].includes(location.hostname);
 const pendingList = $('#pending-list');
+const loadMoreButton = $('#load-more');
 const pendingCount = $('#pending-count');
 const tabPending = $('#tab-pending');
 const tabStaged = $('#tab-staged');
@@ -174,6 +175,12 @@ function projectName(review, company) {
   return (company.projects || []).find(project => project.id === review.projectId)?.name || '';
 }
 
+function waitedDays(value) {
+  const time = Date.parse(value || '');
+  if (!Number.isFinite(time)) return -1;
+  return Math.max(0, Math.floor((Date.now() - time) / 86_400_000));
+}
+
 function renderList() {
   const query = filterInput.value.trim().toLowerCase();
   const staged = state.tab === 'staged';
@@ -215,6 +222,7 @@ function renderList() {
     });
   } else {
     items.forEach(item => {
+      const waited = waitedDays(item.raw?.submittedAt || item.view?.submittedAt);
       pendingList.append(h('button', {
         type: 'button',
         class: 'item' + (item.id === state.selectedId ? ' active' : ''),
@@ -223,7 +231,8 @@ function renderList() {
         h('div', { class: 'item-head' },
           h('strong', {}, item.view.company || '（未填公司）'),
           h('span', {}, `${item.view.score} 分`)),
-        h('div', { class: 'item-meta' }, [item.view.project, (item.raw.submittedAt || '').slice(0, 10)].filter(Boolean).join(' · ')),
+        h('div', { class: `item-meta${waited >= 7 ? ' warn' : ''}` },
+          [item.view.project, (item.raw.submittedAt || '').slice(0, 10), waited >= 0 ? `已等待 ${waited} 天` : ''].filter(Boolean).join(' · ')),
         item.view.flags.length ? h('div', { class: 'flags' }, item.view.flags.join(' · ')) : null,
       ));
     });
@@ -233,6 +242,8 @@ function renderList() {
     ? `暂存 ${state.staging.length} 条`
     : (totalPending > visiblePending.length ? `显示 ${visiblePending.length} / 共 ${totalPending} 条` : `共 ${visiblePending.length} 条`);
   publishBatchButton.disabled = state.busy || !state.staging.length;
+  loadMoreButton.hidden = staged || state.pending.length >= state.pendingTotal;
+  loadMoreButton.disabled = state.busy;
 }
 
 function setTab(tab) {
@@ -600,6 +611,7 @@ function setBusy(busy) {
   state.busy = busy;
   rejectButton.disabled = busy;
   publishBatchButton.disabled = busy || !state.staging.length;
+  loadMoreButton.disabled = busy;
   refreshGate();
 }
 
@@ -740,7 +752,7 @@ async function loadData() {
   const [taxonomyFile, companyTree, pendingResult] = await Promise.all([
     client.getFile(config.owner, config.publicRepo, config.taxonomyPath, config.publicBranch),
     client.getTree(config.owner, config.publicRepo, config.publicBranch),
-    api.listPending(config.maxPending),
+    api.listPending(config.maxPending, 0),
     loadAliases(),
   ]);
   if (!taxonomyFile) throw new Error('公开仓缺少 taxonomy.json');
@@ -783,6 +795,31 @@ async function loadData() {
   state.reviewId = null;
   showEmptyDetail();
   renderList();
+}
+
+async function loadMore() {
+  if (state.busy || state.pending.length >= state.pendingTotal) return;
+  setBusy(true);
+  setStatus(globalStatus, '正在加载更多…');
+  try {
+    const result = await state.api.listPending(config.maxPending, state.pending.length);
+    const existing = new Set(state.pending.map(item => item.id));
+    const extra = (result.items || [])
+      .map(item => {
+        const view = parseSubmission(item.submission);
+        return view ? { id: item.id, raw: item.submission, view } : null;
+      })
+      .filter(item => item && !existing.has(item.id));
+    state.pending = [...state.pending, ...extra]
+      .sort((a, b) => (b.raw.submittedAt || '').localeCompare(a.raw.submittedAt || ''));
+    state.pendingTotal = result.total || state.pendingTotal;
+    renderList();
+    setStatus(globalStatus, '');
+  } catch (error) {
+    setStatus(globalStatus, describeError(error), true);
+  } finally {
+    setBusy(false);
+  }
 }
 
 async function signIn(token, { silent = false } = {}) {
@@ -1099,6 +1136,7 @@ refreshButton.addEventListener('click', async () => {
     refreshButton.disabled = false;
   }
 });
+loadMoreButton.addEventListener('click', loadMore);
 
 filterInput.addEventListener('input', renderList);
 tabPending.addEventListener('click', () => setTab('pending'));

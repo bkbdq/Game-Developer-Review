@@ -35,10 +35,11 @@
 - [x] 接入自定义域名 `goodcorp.games`，DNS 托管 Cloudflare
 - [x] 旧 `gdr-survey.pages.dev` 301 到 `survey.goodcorp.games`
 - [ ] 填写问卷兜底收件邮箱
-- [ ] PoW 挑战改为服务端签发（当前由客户端生成，仅防脚本误提交）
-- [ ] 客户端 PoW 难度与服务端 `POW_DIFFICULTY` 联动
+- [x] PoW 挑战改为服务端签发（HMAC 签名 + 10 分钟过期）
+- [x] 客户端 PoW 难度与服务端 `POW_DIFFICULTY` 联动
 - [ ] 备用境外提交端点（Deno Deploy / Fly.io / Vercel）
-- [ ] D1 导出备份与过期数据清理任务（`ipHash`、已发布提交）
+- [x] 过期数据清理任务（`ipHash`、已发布提交）
+- [x] D1 导出备份（`npm run d1:export`，输出到本地 `.backups/`）
 
 ## M3 审核控制台
 
@@ -56,16 +57,16 @@
 - [x] 拒绝：标记 D1 为 `rejected` 并记录原因
 - [x] 审计日志写入 D1 `audit_log`
 - [x] 批量通过：暂存后一次发布多条，复用「全部发布」（一次 commit、一次展示站更新）
-- [ ] 待审等待时长（超过 7 天标黄）
+- [x] 待审等待时长（列表显示已等待天数，超过 7 天标黄）
 - [x] 删除 / 更正队列：回执校验、列表、处理、审计
 - [x] 联系消息队列：消息列表、已处理标记、审计
 - [x] 问卷 `anonymousProject` → 后端 `projectHidden` → 审核台全链路贯通
 - [ ] GitHub OAuth Device Flow 登录（替代手动粘贴 PAT）
 - [x] 控制台部署后与真实 token 联调（`admin.goodcorp.games`）
 - [x] 本地一键控制台 `start-admin.cmd`，通过后自动构建并部署展示站
-- [ ] 修订已发布评价（`revision + 1`，保留历史）
+- [ ] 展示端标记“已更正”（审核台更正已递增 `revision`，Git 历史保留旧版本）
 - [x] 删除 / 申诉请求处理队列
-- [ ] 大仓库时改用分页 / 增量读取待审列表
+- [x] 大仓库时改用分页 / 增量读取待审列表（列表「加载更多」）
 
 > 说明：批量通过已实现为「暂存 + 全部发布」；当前允许新建公司/项目和黄色软提醒条目，尚未收紧到“仅已匹配公司且无任何敏感提示”。
 
@@ -89,7 +90,7 @@
 - [x] 定时清理：`approved` 7 天后脱敏原始 payload
 - [x] 定时清理：`rejected` 30 天删除、`pending` 90 天删除
 - [x] 定时清理：30 天清空 `ip_hash` 与 `payload.meta.ipHash`
-- [ ] D1 导出备份
+- [x] D1 导出备份
 
 ## M6 匿名与删除
 

@@ -9,6 +9,7 @@ import {
   uaFamily,
   isUuid,
 } from '../_lib/core.js';
+import { verifyChallenge } from '../_lib/pow.js';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
 
@@ -71,7 +72,12 @@ export async function onRequestPost({ request, env }) {
   if (!result.ok) return fail('INVALID_INPUT', 400);
 
   if (input.js) {
-    const difficulty = Number(env.POW_DIFFICULTY || 3);
+    let difficulty = Number(env.POW_DIFFICULTY || 3);
+    if (env.POW_SECRET) {
+      const challenge = await verifyChallenge(input.challenge, env.POW_SECRET);
+      if (!challenge.ok) return fail('POW_FAILED', 422);
+      difficulty = challenge.payload.d;
+    }
     if (!(await verifyPow(input.challenge, input.nonce, difficulty))) return fail('POW_FAILED', 422);
   }
 

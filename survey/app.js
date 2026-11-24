@@ -82,9 +82,30 @@ async function sha256Hex(text) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function solvePow() {
-  const challenge = randomHex(16);
-  const prefix = '0'.repeat(POW_DIFFICULTY);
+async function fetchChallenge() {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 3000);
+  try {
+    const response = await fetch('/api/challenge', {
+      signal: abort.signal,
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data?.challenge) return null;
+    return {
+      challenge: String(data.challenge),
+      difficulty: Number(data.difficulty) || POW_DIFFICULTY,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function solvePow(challenge, difficulty) {
+  const prefix = '0'.repeat(difficulty);
   let nonce = 0;
   while (true) {
     if ((await sha256Hex(`${challenge}:${nonce}`)).startsWith(prefix)) {
@@ -343,7 +364,8 @@ form.addEventListener('submit', async event => {
   setStatus('正在准备校验…');
   let pow;
   try {
-    pow = await solvePow();
+    const remote = await fetchChallenge();
+    pow = await solvePow(remote?.challenge || randomHex(16), remote?.difficulty || POW_DIFFICULTY);
   } catch {
     setStatus('浏览器无法完成本地校验，请换一个浏览器或稍后重试。', true);
     setBusy(false);

@@ -147,6 +147,7 @@ button.danger { background: var(--danger); }
 .list .item-head { display: flex; justify-content: space-between; gap: .5rem; }
 .list .item-head strong { font-size: .95rem; }
 .list .item-meta { color: var(--muted); font-size: .82rem; }
+.list .item-meta.warn { color: var(--warn); font-weight: 600; }
 .list .flags { color: var(--warn); font-size: .78rem; }
 
 .empty { color: var(--muted); padding: 2rem 0; text-align: center; }

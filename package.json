@@ -20,6 +20,7 @@
     "deploy:dev": "npm run build:dev && cd site && npx --yes wrangler@4.165.0 pages deploy dist --project-name gdr-site-dev --branch dev --commit-dirty=true",
     "deploy:survey": "npx --yes wrangler@4.165.0 pages deploy survey --project-name gdr-survey --branch main --commit-dirty=true",
     "deploy:admin": "cd admin && npx --yes wrangler@4.165.0 pages deploy . --project-name gdr-admin --branch main --commit-dirty=true",
-    "deploy:cleanup": "npx --yes wrangler@4.165.0 deploy -c worker/wrangler.toml"
+    "deploy:cleanup": "npx --yes wrangler@4.165.0 deploy -c worker/wrangler.toml",
+    "d1:export": "node scripts/export-d1.mjs"
   }
 }

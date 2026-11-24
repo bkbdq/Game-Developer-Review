@@ -11,3 +11,4 @@ Game-Developer-Review/
 .secrets/
 .dev.vars
 .wrangler/
+.backups/

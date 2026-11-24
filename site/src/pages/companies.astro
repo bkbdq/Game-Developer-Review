@@ -6,9 +6,9 @@ import { minimumRatingCount } from '../lib/project-stats';
 import { companyRatings, projectsByStudio } from '../lib/projects';
 import { surveyUrl } from '../lib/survey';
 import '../styles/studios.css';
-import { href, index, detail, scoreText, month } from '../lib/data';
+import { href, index, companyAliases, scoreText, month } from '../lib/data';
 const sorted = index.companies.map(c => ({
-  ...c, aliases: c.aliases ?? detail(c.id).company.aliases ?? [], titles: projectsByStudio.get(c.slug) ?? [],
+  ...c, aliases: companyAliases(c.id), titles: projectsByStudio.get(c.slug) ?? [],
   rating: companyRatings.get(c.id)!,
   mean: c.reviewCount ? Object.entries(c.scoreDistribution).reduce((sum,[score,count])=>sum + Number(score)*count,0) / c.reviewCount : -1,
 })).sort((a,b) => b.rating.gradeRank-a.rating.gradeRank || b.reviewCount-a.reviewCount || a.name.localeCompare(b.name,'zh-CN'));

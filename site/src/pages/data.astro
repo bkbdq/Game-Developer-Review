@@ -1,0 +1,61 @@
+---
+import InfoPage from '../components/InfoPage.astro';
+import { href, index, manifest, scoreText } from '../lib/data';
+const files = [
+  { path: 'manifest.json', content: '版本、生成时间、总数', usage: '用于判断缓存是否过期', link: true },
+  { path: 'index.json', content: '公司列表与聚合评分', usage: '目录、搜索、公司卡片使用', link: true },
+  { path: 'companies/{companyId}.json', content: '单家公司、项目、画像统计与全部公开评价', usage: '公司页、项目页使用', link: false },
+  { path: 'taxonomy.json', content: '岗位、司龄、在职状态、城市、标签枚举', usage: '展示中文标签时使用', link: true },
+];
+---
+<InfoPage title="数据接口">
+  <section>
+    <h2>公开数据</h2>
+    <p>展示站的全部公开数据都是静态 JSON，放在 <a href={href('data/v1/manifest.json')}><code>/data/v1/</code></a> 下，可直接下载或用于其他非商业展示。数据只包含已审核通过的公开评价，不含提交时间、网络地址、联系方式、审核记录或公司别名。</p>
+    <p>生成时间：<time datetime={manifest.generatedAt}>{manifest.generatedAt.slice(0, 10)}</time>（北京时间）。共 {index.totals.companies} 家公司、{index.totals.projects} 个项目、{index.totals.reviews} 条评价。</p>
+  </section>
+
+  <section>
+    <h2>文件与字段</h2>
+    <div class="data-table">
+      <div class="data-row data-head"><span>路径</span><span>内容</span><span>用途</span></div>
+      {files.map(file => (
+        <div class="data-row">
+          <span>{file.link ? <a href={href('data/v1/' + file.path)}><code>{file.path}</code></a> : <code>{file.path}</code>}</span>
+          <span>{file.content}</span><span>{file.usage}</span>
+        </div>
+      ))}
+    </div>
+    <p>所有文件都带 <code>schemaVersion: 1</code>。结构变化时会发布新路径版本，旧路径至少保留一个版本周期。</p>
+  </section>
+
+  <section>
+    <h2>下载</h2>
+    <p><a href={href('data/v1/index.json')} download>公司列表 index.json</a> · <a href={href('data/v1/manifest.json')} download>清单 manifest.json</a> · <a href={href('data/v1/taxonomy.json')} download>枚举 taxonomy.json</a></p>
+    <ul class="data-companies">
+      {index.companies.map(company => (
+        <li><a href={href('data/v1/companies/' + company.id + '.json')} download>{company.name}</a><span>{company.reviewCount} 条评价 · 平均 {scoreText(company.avgScore)}</span></li>
+      ))}
+    </ul>
+  </section>
+
+  <section>
+    <h2>使用说明</h2>
+    <p>数据按现状提供，不保证完整、实时或适用于特定用途。评价是作者个人观点，如需删除或更正，请通过<a href={href('requests/')}>申请删除或更正</a>提交回执；其他问题请<a href={href('contact/')}>联系我们</a>。</p>
+    <p>跨域读取 <code>/data/v1/*.json</code> 已开放 <code>Access-Control-Allow-Origin: *</code>，请自行缓存并尊重 <code>generatedAt</code>，不要高频轮询。</p>
+  </section>
+</InfoPage>
+<style>
+  .data-table { margin: 12px 0; border: 1px solid #395160; border-radius: 4px; overflow: hidden; }
+  .data-row { display: grid; grid-template-columns: minmax(180px, 1.2fr) 1.6fr 1.2fr; gap: 12px; padding: 10px 12px; border-top: 1px solid #334a58; font-size: 14px; }
+  .data-row:first-child { border-top: 0; }
+  .data-head { background: #162b39; color: #edf5f7; font-weight: 700; }
+  .data-row code { font-size: 13px; }
+  .data-companies { margin: 12px 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .data-companies li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid #334a58; }
+  .data-companies span { color: #b9ccd4; font-size: 14px; }
+  @media (max-width: 640px) {
+    .data-row { grid-template-columns: 1fr; gap: 4px; }
+    .data-head { display: none; }
+  }
+</style>

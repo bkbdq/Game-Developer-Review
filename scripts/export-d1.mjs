@@ -10,5 +10,6 @@ const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const args = ['--yes', 'wrangler@4.165.0', 'd1', 'export', 'goodcompany', '--remote', '--output', output];
 
 console.log(`导出 D1 到 ${output}`);
-const result = spawnSync(command, args, { stdio: 'inherit' });
+const result = spawnSync(command, args, { stdio: 'inherit', shell: true, env: process.env });
+if (result.error) console.error(result.error.message);
 process.exit(result.status ?? 1);

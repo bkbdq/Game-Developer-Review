@@ -8,4 +8,4 @@ crons = ["17 3 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "goodcompany"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "ee49542c-28f0-4b50-bcba-e0087bcd12f5"

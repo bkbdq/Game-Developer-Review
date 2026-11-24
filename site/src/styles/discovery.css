@@ -150,6 +150,7 @@ body .topbar { background:#101a23; border-color:#2e404d; color:#edf4f7; }
 .project-reviews .review { margin-bottom:12px; background:#203340; border-color:#3a5060; border-radius:5px; }
 .project-reviews .review :is(p,details) { color:#dbe3e9; }
 .project-reviews .review :is(.review-meta,time) { color:#b6c7d2; }
+.project-reviews .review .review-revised { background:#4a3f22; color:#f0d58c; }
 .project-reviews .review :is(.review-score,.chips span) { color:#a5dbdf; background:#2e4a58; }
 .project-reviews .review em { color:#95dce7; }
 @media (max-width:920px) {

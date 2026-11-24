@@ -22,7 +22,7 @@
 
     <div id="draft-note" class="notice" hidden>已恢复上次未完成的内容。</div>
 
-    <form id="submit-form" action="/api/submit" method="post">
+    <form id="submit-form" action="/api/submit" method="post" data-fallback-email="">
       <div class="field">
         <label for="company">公司名 <em>必填</em></label>
         <input id="company" name="company" type="text" maxlength="50" list="company-options" autocomplete="organization" required>
@@ -105,6 +105,7 @@
       <p>尚未收到提交确认。可以重试，或先复制内容。</p>
       <div class="actions">
         <button type="button" id="copy-button">复制内容</button>
+        <a id="mail-button" class="button" href="#" hidden>邮件提交</a>
         <button type="button" id="retry-button">重新提交</button>
         <button type="button" id="delete-button" class="ghost">删除本地副本</button>
       </div>

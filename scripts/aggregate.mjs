@@ -7,6 +7,7 @@ const dataDir = resolve(root, 'data');
 const testDir = resolve(root, 'data-test');
 const includeTest = process.argv.includes('--test');
 const outDir = resolve(root, 'site/public/data/v1');
+const generatedDir = resolve(root, 'site/src/generated');
 
 const readJson = path => JSON.parse(readFileSync(path, 'utf8'));
 const dataDirs = includeTest ? [dataDir, testDir] : [dataDir];
@@ -99,7 +100,6 @@ function buildDetail(company) {
       id: company.id,
       slug: company.slug,
       name: company.name,
-      aliases: company.aliases || [],
       reviewCount: reviews.length,
       avgScore: avg(scores),
       scoreDistribution: distribution(reviews),
@@ -130,6 +130,11 @@ function main() {
 
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(join(outDir, 'companies'), { recursive: true });
+  mkdirSync(generatedDir, { recursive: true });
+
+  // 别名仅用于构建期搜索匹配，不进入公开 JSON / API
+  const aliases = Object.fromEntries(companies.map(company => [company.id, company.aliases || []]));
+  writeFileSync(join(generatedDir, 'aliases.json'), JSON.stringify(aliases, null, 2) + '\n', 'utf8');
 
   const index = {
     schemaVersion: 1,

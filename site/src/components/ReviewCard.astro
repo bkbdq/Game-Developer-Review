@@ -5,7 +5,10 @@ const {review:r,projectName,projectFilter,showTenure=false}=Astro.props;
 const meta = [projectName, showTenure && label(taxonomy.tenures, r.profile?.tenure)].filter(Boolean).join(' · ');
 ---
 <article class="panel review" data-project={projectFilter}>
-  <div class="review-line"><span class="review-score"><span aria-hidden="true">★</span> {r.score} 星</span><time datetime={r.publishedAt.slice(0,7)}>{month(r.publishedAt)}</time></div>
+  <div class="review-line">
+    <span class="review-score"><span aria-hidden="true">★</span> {r.score} 星</span>
+    <span class="review-stamp">{r.revision > 1 && <em class="review-revised">已更正</em>}<time datetime={r.publishedAt.slice(0,7)}>{month(r.publishedAt)}</time></span>
+  </div>
   {r.title && <h3>{r.title}</h3>}
   {r.comment.length>140 ? <details><summary><span class="excerpt">{r.comment.slice(0,120)}… <em>展开全文</em></span><em class="collapse">收起全文</em></summary><p>{r.comment}</p></details> : <p>{r.comment}</p>}
   {meta && <div class="review-meta">{meta}</div>}

@@ -1,10 +1,13 @@
 {
   "name": "game-developer-review",
   "private": true,
-  "workspaces": ["site"],
+  "workspaces": [
+    "site"
+  ],
   "scripts": {
     "dev:survey": "node tools/survey-preview.mjs",
     "data:validate": "node scripts/validate.mjs",
+    "data:types": "node scripts/gen-types.mjs",
     "data:build": "node scripts/aggregate.mjs",
     "data:build:dev": "node scripts/aggregate.mjs --test",
     "test:m2": "node scripts/test-m2.mjs",
@@ -16,11 +19,14 @@
     "build": "npm run data:validate && npm run data:build && npm run build --workspace site",
     "build:dev": "npm run data:validate && npm run data:build:dev && npm run build --workspace site",
     "preview": "npm run preview --workspace site",
-    "deploy:site": "npm run build && cd site && npx --yes wrangler@4.165.0 pages deploy dist --project-name gdr-site --branch main --commit-dirty=true",
-    "deploy:dev": "npm run build:dev && cd site && npx --yes wrangler@4.165.0 pages deploy dist --project-name gdr-site-dev --branch dev --commit-dirty=true",
-    "deploy:survey": "npx --yes wrangler@4.165.0 pages deploy survey --project-name gdr-survey --branch main --commit-dirty=true",
+    "deploy:site": "npm run build && node tools/deploy-pages.mjs --project gdr-site --assets site/dist --functions site/functions --branch main",
+    "deploy:dev": "npm run build:dev && node tools/deploy-pages.mjs --project gdr-site-dev --assets site/dist --functions site/functions --branch dev",
+    "deploy:survey": "node tools/deploy-pages.mjs --project gdr-survey --assets survey --functions functions --branch main",
     "deploy:admin": "cd admin && npx --yes wrangler@4.165.0 pages deploy . --project-name gdr-admin --branch main --commit-dirty=true",
     "deploy:cleanup": "npx --yes wrangler@4.165.0 deploy -c worker/wrangler.toml",
     "d1:export": "node scripts/export-d1.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
   }
 }

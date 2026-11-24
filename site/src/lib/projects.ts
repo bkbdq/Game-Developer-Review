@@ -1,4 +1,4 @@
-import { detail, href, index } from './data';
+import { companyAliases, detail, href, index } from './data';
 import { compareProjects, isRecentPick, projectStats } from './project-stats';
 
 const artwork: Record<string, [string, string]> = {
@@ -17,7 +17,7 @@ const studios = index.companies.map(company => {
 });
 export const companyRatings = new Map(studios.map(studio => [studio.company.id, studio.rating]));
 export const projects = studios.flatMap(({company:c, data, rating}) => {
-  const aliases = data.company.aliases ?? [];
+  const aliases = companyAliases(c.id);
   return data.projects.map(project => {
     const reviews = data.reviews.filter(r=>r.projectId===project.id).sort((a,b)=>b.publishedAt.localeCompare(a.publishedAt));
     const featuredReview = reviews.find(r=>r.id===project.featuredReviewId)

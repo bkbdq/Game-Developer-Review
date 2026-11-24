@@ -8,6 +8,7 @@ const againButton = document.querySelector('#again-button');
 const fallbackPanel = document.querySelector('#fallback-panel');
 const fallbackStatus = document.querySelector('#fallback-status');
 const copyButton = document.querySelector('#copy-button');
+const mailButton = document.querySelector('#mail-button');
 const retryButton = document.querySelector('#retry-button');
 const deleteButton = document.querySelector('#delete-button');
 const companyReturn = document.querySelector('#company-return');
@@ -21,6 +22,8 @@ document.querySelectorAll('[data-site-path]').forEach(link => {
 });
 const draftNote = document.querySelector('#draft-note');
 const companyList = document.querySelector('#company-options');
+// 兜底收件邮箱留空时不显示「邮件提交」
+const fallbackEmail = (form.dataset.fallbackEmail || '').trim();
 
 const FIELDS = ['company', 'companyId', 'project', 'score', 'tenure', 'comment'];
 const query = new URLSearchParams(location.search);
@@ -335,6 +338,10 @@ function showFallback(message) {
   clearTimers();
   setBusy(false);
   saveDraft();
+  if (fallbackEmail) {
+    mailButton.hidden = false;
+    mailButton.href = `mailto:${fallbackEmail}?subject=${encodeURIComponent('匿名评价提交')}&body=${encodeURIComponent(buildText())}`;
+  }
   fallbackPanel.hidden = false;
   setStatus('');
   setFallbackStatus(message || '内容已保存到本机。');

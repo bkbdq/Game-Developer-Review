@@ -45,6 +45,12 @@ const localMode = ['127.0.0.1', 'localhost', '::1'].includes(location.hostname);
 const pendingList = $('#pending-list');
 const loadMoreButton = $('#load-more');
 const pendingCount = $('#pending-count');
+const overviewPending = $('#overview-pending');
+const overviewRequests = $('#overview-requests');
+const overviewContacts = $('#overview-contacts');
+const countPending = $('#count-pending');
+const countRequests = $('#count-requests');
+const countContacts = $('#count-contacts');
 const tabPending = $('#tab-pending');
 const tabStaged = $('#tab-staged');
 const stagedBar = $('#staged-bar');
@@ -103,6 +109,7 @@ const state = {
   aliasIndex: new Map(),
   pending: [],
   pendingTotal: 0,
+  counts: { pending: 0, requests: 0, contacts: 0 },
   staging: loadStaging(),
   tab: 'pending',
   selected: null,
@@ -119,6 +126,45 @@ const state = {
 function setStatus(element, message, isError = false) {
   element.textContent = message || '';
   element.classList.toggle('error', Boolean(isError));
+}
+
+function renderOverview() {
+  countPending.textContent = String(state.counts.pending);
+  countRequests.textContent = String(state.counts.requests);
+  countContacts.textContent = String(state.counts.contacts);
+  overviewPending.classList.toggle('has-items', state.counts.pending > 0);
+  overviewRequests.classList.toggle('has-items', state.counts.requests > 0);
+  overviewContacts.classList.toggle('has-items', state.counts.contacts > 0);
+}
+
+async function refreshOverview() {
+  if (!state.api || state.busy) return;
+  try {
+    const summary = await state.api.summary();
+    state.counts = {
+      pending: summary.pending || 0,
+      requests: summary.requests || 0,
+      contacts: summary.contacts || 0,
+    };
+    renderOverview();
+  } catch {
+    // 总览轮询失败不打断审核流程，下一次刷新或操作会再试
+  }
+}
+
+const OVERVIEW_POLL_MS = 30000;
+let overviewTimer = null;
+
+function startOverviewPolling() {
+  stopOverviewPolling();
+  overviewTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') refreshOverview();
+  }, OVERVIEW_POLL_MS);
+}
+
+function stopOverviewPolling() {
+  if (overviewTimer) clearInterval(overviewTimer);
+  overviewTimer = null;
 }
 
 function describeError(error) {
@@ -749,11 +795,12 @@ async function loadData() {
   const { client, api } = state;
   setStatus(globalStatus, '正在加载数据…');
 
-  const [taxonomyFile, companyTree, pendingResult] = await Promise.all([
+  const [taxonomyFile, companyTree, pendingResult, , summary] = await Promise.all([
     client.getFile(config.owner, config.publicRepo, config.taxonomyPath, config.publicBranch),
     client.getTree(config.owner, config.publicRepo, config.publicBranch),
     api.listPending(config.maxPending, 0),
     loadAliases(),
+    api.summary(),
   ]);
   if (!taxonomyFile) throw new Error('公开仓缺少 taxonomy.json');
 
@@ -790,6 +837,12 @@ async function loadData() {
     .filter(Boolean)
     .sort((a, b) => (b.raw.submittedAt || '').localeCompare(a.raw.submittedAt || ''));
   state.pendingTotal = pendingResult.total || 0;
+  state.counts = {
+    pending: state.pendingTotal,
+    requests: summary.requests || 0,
+    contacts: summary.contacts || 0,
+  };
+  renderOverview();
   state.selected = null;
   state.selectedId = null;
   state.reviewId = null;
@@ -833,6 +886,7 @@ async function signIn(token, { silent = false } = {}) {
     state.client = client;
     state.api = api;
     await loadData();
+    startOverviewPolling();
 
     loginView.hidden = true;
     appView.hidden = false;
@@ -849,11 +903,14 @@ async function signIn(token, { silent = false } = {}) {
 }
 
 function signOut(message = '') {
+  stopOverviewPolling();
   sessionStorage.removeItem(TOKEN_KEY);
   state.client = null;
   state.api = null;
   state.pending = [];
   state.pendingTotal = 0;
+  state.counts = { pending: 0, requests: 0, contacts: 0 };
+  renderOverview();
   state.companies = new Map();
   state.aliasIndex = new Map();
   state.selected = null;
@@ -990,6 +1047,8 @@ async function publishStaged() {
     const removed = state.pending.filter(item => approved.has(item.id)).length;
     state.pending = state.pending.filter(item => !approved.has(item.id));
     state.pendingTotal = Math.max(0, state.pendingTotal - removed);
+    state.counts.pending = state.pendingTotal;
+    renderOverview();
     if (!state.staging.length) state.tab = 'pending';
 
     let deployNote = '';
@@ -1045,6 +1104,8 @@ async function handleApprove(event) {
 
     state.pending = state.pending.filter(entry => entry.id !== item.id);
     state.pendingTotal = Math.max(0, state.pendingTotal - 1);
+    state.counts.pending = state.pendingTotal;
+    renderOverview();
     showEmptyDetail();
     setStatus(globalStatus, `已发布 ${review.id} → ${review.companyId}${deployNote}`);
   } catch (error) {
@@ -1085,6 +1146,8 @@ async function handleRejectConfirm() {
     await state.api.reject(item.id, { reason: finalReason });
     state.pending = state.pending.filter(entry => entry.id !== item.id);
     state.pendingTotal = Math.max(0, state.pendingTotal - 1);
+    state.counts.pending = state.pendingTotal;
+    renderOverview();
     resetRejectPanel();
     showEmptyDetail();
     setStatus(globalStatus, `已拒绝 ${item.raw.submissionId}`);
@@ -1137,6 +1200,20 @@ refreshButton.addEventListener('click', async () => {
   }
 });
 loadMoreButton.addEventListener('click', loadMore);
+
+overviewPending.addEventListener('click', () => {
+  setTab('pending');
+  pendingList.scrollIntoView({ block: 'nearest' });
+  filterInput.focus();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshOverview();
+});
+window.addEventListener('focus', () => refreshOverview());
+window.addEventListener('pageshow', event => {
+  if (event.persisted) refreshOverview();
+});
 
 filterInput.addEventListener('input', renderList);
 tabPending.addEventListener('click', () => setTab('pending'));

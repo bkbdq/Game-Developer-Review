@@ -33,6 +33,11 @@ const state = {
   busy: false,
 };
 
+const initialTab = new URLSearchParams(location.search).get('tab') === 'contacts' ? 'contacts' : 'requests';
+state.tab = initialTab;
+tabRequests.classList.toggle('active', initialTab === 'requests');
+tabContacts.classList.toggle('active', initialTab === 'contacts');
+
 function setStatus(element, message, isError = false) {
   element.textContent = message || '';
   element.classList.toggle('error', Boolean(isError));

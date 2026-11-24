@@ -30,6 +30,24 @@
     </section>
 
     <section id="app-view" hidden>
+      <section class="overview" aria-label="待处理总览">
+        <button id="overview-pending" type="button" class="overview-card">
+          <span class="overview-label">待审评价</span>
+          <strong id="count-pending">0</strong>
+          <small>去审核</small>
+        </button>
+        <a id="overview-requests" class="overview-card" href="/requests.html?tab=requests">
+          <span class="overview-label">删除 / 更正</span>
+          <strong id="count-requests">0</strong>
+          <small>去处理</small>
+        </a>
+        <a id="overview-contacts" class="overview-card" href="/requests.html?tab=contacts">
+          <span class="overview-label">联系消息</span>
+          <strong id="count-contacts">0</strong>
+          <small>去查看</small>
+        </a>
+      </section>
+
       <div class="toolbar">
         <input id="filter" type="search" placeholder="搜索公司或项目" autocomplete="off">
         <button id="refresh-button" type="button" class="ghost">刷新</button>

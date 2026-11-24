@@ -35,6 +35,7 @@ export function createApi(token, base = DEFAULT_BASE) {
 
   return {
     me: () => request('/me'),
+    summary: () => request('/summary'),
     listPending: (limit = 50, offset = 0) => request(
       `/submissions?status=pending&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`,
     ),

@@ -139,7 +139,7 @@ assert.equal(admin.audits[0][3], receipt);
 
 const contacted = await handleContact(admin, { id: 'c1', reviewer: 'devA', note: '已回复' });
 assert.equal(contacted.ok, true);
-assert.equal(admin.audits[1].length, 3);
+assert.equal(admin.audits[1].length, 4);
 assert.equal(admin.audits[1][1], 'devA');
 
 const steps = [];

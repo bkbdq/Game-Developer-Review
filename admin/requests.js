@@ -173,8 +173,9 @@ async function handleDeletion(item) {
   setStatus(detailStatus(), '正在删除公开评价…');
   try {
     const target = await resolveReview(item);
+    let deleted = null;
     try {
-      await state.client.deleteFile(config.owner, config.publicRepo, target.path, {
+      deleted = await state.client.deleteFile(config.owner, config.publicRepo, target.path, {
         message: `data: delete ${item.reviewId}`,
         sha: target.file.sha,
         branch: config.publicBranch,
@@ -187,6 +188,7 @@ async function handleDeletion(item) {
       note: '已删除公开评价',
       reviewId: item.reviewId,
       companyId: target.companyId,
+      commitSha: deleted?.commit?.sha || '',
     });
     setStatus(globalStatus, `已删除并处理：${item.reviewId}`);
     await loadItems();
@@ -219,7 +221,7 @@ async function startCorrection(item) {
           setStatus(detailStatus(), '正在提交更正…');
           try {
             const next = { ...review, comment, revision: Number(review.revision || 1) + 1 };
-            await state.client.putFile(config.owner, config.publicRepo, target.path, {
+            const updated = await state.client.putFile(config.owner, config.publicRepo, target.path, {
               message: `data: correct ${item.reviewId}`,
               content: JSON.stringify(next, null, 2) + '\n',
               sha: target.file.sha,
@@ -230,6 +232,7 @@ async function startCorrection(item) {
               note: '已更正公开评价正文',
               reviewId: item.reviewId,
               companyId: target.companyId,
+              commitSha: updated?.commit?.sha || '',
             });
             setStatus(globalStatus, `已更正并处理：${item.reviewId}`);
             await loadItems();

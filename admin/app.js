@@ -1008,13 +1008,24 @@ function handleStage() {
   }
 }
 
+async function logDeployEvent(result, note) {
+  try {
+    await state.api.logEvent({ action: 'deploy_showcase', result, note });
+  } catch {
+    // 部署日志失败不影响主流程
+  }
+}
+
 async function updateShowcase() {
   if (!localMode) return '';
   try {
     const response = await fetch('/api/local/deploy', { method: 'POST' });
     const data = await response.json().catch(() => ({}));
-    return data.ok ? '；展示站已更新' : `；展示站未更新：${data.message || `HTTP ${response.status}`}`;
+    const note = data.ok ? '展示站已更新' : (data.message || `HTTP ${response.status}`);
+    await logDeployEvent(data.ok ? 'success' : 'failed', note);
+    return data.ok ? '；展示站已更新' : `；展示站未更新：${note}`;
   } catch (error) {
+    await logDeployEvent('failed', error.message);
     return `；展示站未更新：${error.message}`;
   }
 }
@@ -1025,7 +1036,7 @@ async function publishStaged() {
   setStatus(globalStatus, `正在发布 ${state.staging.length} 条暂存…`);
 
   try {
-    await publishReviews({
+    const published = await publishReviews({
       client: state.client,
       config,
       items: state.staging.map(({ review, company }) => ({ review, company })),
@@ -1035,7 +1046,11 @@ async function publishStaged() {
     const approved = new Set();
     for (const entry of state.staging) {
       try {
-        await state.api.approve(entry.submissionId, { reviewId: entry.review.id, companyId: entry.company.id });
+        await state.api.approve(entry.submissionId, {
+          reviewId: entry.review.id,
+          companyId: entry.company.id,
+          commitSha: published.commitSha || '',
+        });
         approved.add(entry.submissionId);
       } catch (error) {
         failures.push(`${entry.review.id}：${describeError(error)}`);
@@ -1089,9 +1104,13 @@ async function handleApprove(event) {
 
   try {
     const { review, company } = collectDraft();
-    await publishReview({ client: state.client, config, review, company });
+    const published = await publishReview({ client: state.client, config, review, company });
     try {
-      await state.api.approve(item.id, { reviewId: review.id, companyId: company.id });
+      await state.api.approve(item.id, {
+        reviewId: review.id,
+        companyId: company.id,
+        commitSha: published.commitSha || '',
+      });
     } catch (error) {
       throw new Error(`已写入公开仓 ${review.id}，但审核状态记录失败，请重试「通过并发布」。${error.message}`);
     }
@@ -1175,8 +1194,10 @@ async function deploySite() {
     const response = await fetch('/api/local/deploy', { method: 'POST' });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.ok) throw new Error(data.message || `HTTP ${response.status}`);
+    await logDeployEvent('success', '展示站已更新');
     setStatus(globalStatus, '展示站已更新');
   } catch (error) {
+    await logDeployEvent('failed', error.message);
     setStatus(globalStatus, `展示站未更新：${error.message}`, true);
   } finally {
     deployButton.disabled = false;

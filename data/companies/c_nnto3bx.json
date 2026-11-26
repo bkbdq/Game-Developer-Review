@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_nnto3bx",
+  "slug": "nnto3bx",
+  "name": "元绎娱乐",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_2033-gbn674",
+      "name": "棱镜2033",
+      "status": "dev"
+    }
+  ],
+  "createdAt": "2026-11-26",
+  "updatedAt": "2026-11-26"
+}

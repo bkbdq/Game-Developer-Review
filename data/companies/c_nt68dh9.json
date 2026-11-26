@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_nt68dh9",
+  "slug": "nt68dh9",
+  "name": "网易",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_ai-lab-6920px",
+      "name": "互娱AI Lab",
+      "status": "dev"
+    }
+  ],
+  "createdAt": "2026-11-26",
+  "updatedAt": "2026-11-26"
+}

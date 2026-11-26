@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_ncgtepy",
+  "slug": "ncgtepy",
+  "name": "天智游",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_nrv9ixr",
+      "name": "新诛仙",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-26",
+  "updatedAt": "2026-11-26"
+}

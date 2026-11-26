@@ -7,7 +7,7 @@
 
 - [x] `schema/review.schema.json`、`company.schema.json`、`taxonomy.schema.json`
 - [x] `data/taxonomy.json` 枚举字典
-- [x] 样例数据迁移与拆分：正式 `data/` 现为 2 家公司、3 个项目、3 条评价；演示数据（10 家公司、29 条评价）保留在 `data-test/`，正式构建忽略
+- [x] 样例数据迁移与拆分：正式 `data/` 与 `data-test/` 的测试数据已全部清空（2026-11-26），等待真实审核数据；正式构建只读 `data/`
 - [x] `scripts/validate.mjs`：结构、枚举、引用完整性、敏感字段与正则扫描
 - [x] `scripts/aggregate.mjs`：生成 `index.json`、`manifest.json`、`taxonomy.json`、`companies/{id}.json`
 - [x] 用 ajv 替换手写校验（`npm run data:validate`，其余语义检查保留）

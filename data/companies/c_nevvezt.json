@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_nevvezt",
+  "slug": "nevvezt",
+  "name": "龙锐游戏",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_ndlhhv8",
+      "name": "见习猎魔团",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-26",
+  "updatedAt": "2026-11-26"
+}

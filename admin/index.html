@@ -21,7 +21,7 @@
   <main>
     <section id="login-view" class="panel login">
       <h1>管理员登录</h1>
-      <p>粘贴 PAT。仓库主人用 fine-grained token（Contents 读写）；仓库协作者用 classic token（勾选 repo）。token 只保存在当前标签页的 sessionStorage，关闭标签页后失效。</p>
+      <p>粘贴 PAT。仓库主人用 fine-grained token（Contents 读写）；仓库协作者用 classic token（勾选 repo）。token 保存在浏览器 cookie，30 天内免登录；点「退出」会清除。</p>
       <form id="login-form">
         <label for="token">GitHub Token</label>
         <input id="token" type="password" autocomplete="off" spellcheck="false" required>

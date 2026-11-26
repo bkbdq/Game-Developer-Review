@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_n7ewxx3",
+  "slug": "n7ewxx3",
+  "name": "游戏科学",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_n86bsw0",
+      "name": "黑神话悟空",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-26",
+  "updatedAt": "2026-11-26"
+}

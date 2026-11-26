@@ -1,8 +1,8 @@
 import { createApi, ApiError } from './lib/api.js';
+import { getToken, setToken, clearToken } from './lib/token.js';
 import { config } from './config.js';
 import { h } from './lib/dom.js';
 
-const TOKEN_KEY = 'gdr.admin.token';
 const PAGE = 50;
 
 const ACTION_OPTIONS = [
@@ -158,7 +158,7 @@ async function signIn(token, { silent = false } = {}) {
   try {
     const api = createApi(token);
     const me = await api.me();
-    sessionStorage.setItem(TOKEN_KEY, token);
+    setToken(token);
     state.api = api;
     state.login = me.login;
     userLabel.textContent = `@${me.login}`;
@@ -168,14 +168,14 @@ async function signIn(token, { silent = false } = {}) {
     setStatus(loginStatus, '');
     await load();
   } catch (error) {
-    sessionStorage.removeItem(TOKEN_KEY);
+    if (error.status === 401 || error.status === 403) clearToken();
     state.api = null;
     setStatus(loginStatus, describeError(error), true);
   }
 }
 
 function signOut(message = '') {
-  sessionStorage.removeItem(TOKEN_KEY);
+  clearToken();
   state.api = null;
   state.items = [];
   state.offset = 0;
@@ -216,5 +216,5 @@ nextButton.addEventListener('click', () => {
   load();
 });
 
-const saved = sessionStorage.getItem(TOKEN_KEY);
+const saved = getToken();
 if (saved) signIn(saved, { silent: true });

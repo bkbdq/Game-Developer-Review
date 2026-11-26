@@ -1,5 +1,6 @@
 import { createClient } from './lib/github.js';
 import { createApi } from './lib/api.js';
+import { getToken, setToken, clearToken } from './lib/token.js';
 import { config } from './config.js';
 import { h } from './lib/dom.js';
 import { bestKeyScore, buildAliasIndex, normalize, AUTO_MATCH_THRESHOLD } from './lib/match.js';
@@ -20,7 +21,6 @@ import {
 } from './lib/review.js';
 import { publishReview, publishReviews } from './lib/publish.js';
 
-const TOKEN_KEY = 'gdr.admin.token';
 const STAGING_KEY = 'gdr.admin.staging';
 
 // M4·FE-4：拒绝原因下拉（内部记录，不通知提交者）
@@ -882,7 +882,7 @@ async function signIn(token, { silent = false } = {}) {
     const api = createApi(token);
     const me = await api.me();
 
-    sessionStorage.setItem(TOKEN_KEY, token);
+    setToken(token);
     state.client = client;
     state.api = api;
     await loadData();
@@ -895,7 +895,7 @@ async function signIn(token, { silent = false } = {}) {
     setStatus(loginStatus, '');
     setStatus(globalStatus, `已加载 ${state.pending.length} 条待审提交`);
   } catch (error) {
-    sessionStorage.removeItem(TOKEN_KEY);
+    if (error.status === 401 || error.status === 403) clearToken();
     state.client = null;
     state.api = null;
     setStatus(loginStatus, describeError(error), true);
@@ -904,7 +904,7 @@ async function signIn(token, { silent = false } = {}) {
 
 function signOut(message = '') {
   stopOverviewPolling();
-  sessionStorage.removeItem(TOKEN_KEY);
+  clearToken();
   state.client = null;
   state.api = null;
   state.pending = [];
@@ -1286,5 +1286,5 @@ newProjectName.addEventListener('input', () => {
 });
 newProjectId.addEventListener('input', () => { newProjectId.dataset.touched = '1'; });
 
-const savedToken = sessionStorage.getItem(TOKEN_KEY);
+const savedToken = getToken();
 if (savedToken) signIn(savedToken, { silent: true });

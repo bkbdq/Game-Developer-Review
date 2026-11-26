@@ -389,6 +389,10 @@ legend { padding: 0 .35rem; color: var(--muted); font-size: .85rem; }
 
 /* 已展示数据管理 */
 button.small { padding: .3rem .65rem; font-size: .82rem; }
+.list.is-loading { pointer-events: none; opacity: .65; }
+#company-detail[aria-busy="true"] { cursor: progress; }
+#company-detail[aria-busy="true"] #company-form,
+#company-detail[aria-busy="true"] #review-list { opacity: .55; pointer-events: none; }
 .detail h2 { margin: 0; font-size: 1.3rem; }
 .published-head {
   display: flex;

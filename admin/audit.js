@@ -1,5 +1,6 @@
 import { createApi, ApiError } from './lib/api.js';
 import { getToken, setToken, clearToken } from './lib/token.js';
+import { getSession, setSession, clearSession } from './lib/session.js';
 import { config } from './config.js';
 import { h } from './lib/dom.js';
 
@@ -186,19 +187,28 @@ async function load() {
 
 async function signIn(token, { silent = false } = {}) {
   if (!token) {
+    clearSession();
     showLogin();
     return;
   }
-  showBoot(silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…');
-  let authenticated = false;
+  const cached = silent ? getSession() : null;
+  let authenticated = Boolean(cached);
+  showBoot(cached
+    ? '正在加载审计日志…'
+    : (silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…'));
   try {
     const api = createApi(token);
-    const me = await api.me();
-    authenticated = true;
+    let login = cached?.login || '';
+    if (!cached) {
+      const me = await api.me();
+      login = me.login;
+      authenticated = true;
+      setSession(login);
+    }
     setToken(token);
     state.api = api;
-    state.login = me.login;
-    userLabel.textContent = `@${me.login}`;
+    state.login = login;
+    userLabel.textContent = login ? `@${login}` : '';
     showBoot('登录有效，正在加载审计日志…');
     await load();
     showApp();
@@ -207,6 +217,7 @@ async function signIn(token, { silent = false } = {}) {
     state.api = null;
     if (error.status === 401) {
       clearToken();
+      clearSession();
       showLogin(describeError(error));
       return;
     }
@@ -220,6 +231,7 @@ async function signIn(token, { silent = false } = {}) {
 
 function signOut(message = '') {
   clearToken();
+  clearSession();
   state.api = null;
   state.items = [];
   state.offset = 0;
@@ -243,6 +255,7 @@ bootRetry.addEventListener('click', () => {
 });
 bootLogin.addEventListener('click', () => {
   clearToken();
+  clearSession();
   showLogin();
   tokenInput.focus();
 });
@@ -269,4 +282,7 @@ nextButton.addEventListener('click', () => {
 
 const saved = getToken();
 if (saved) signIn(saved, { silent: true });
-else showLogin();
+else {
+  clearSession();
+  showLogin();
+}

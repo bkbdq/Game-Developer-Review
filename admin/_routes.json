@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/app.js",
+    "/audit.js",
+    "/requests.js",
+    "/published.js",
+    "/config.js",
+    "/style.css",
+    "/lib/*"
+  ]
+}

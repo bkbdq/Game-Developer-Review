@@ -1,6 +1,7 @@
 import { createClient } from './lib/github.js';
 import { createApi } from './lib/api.js';
 import { getToken, setToken, clearToken } from './lib/token.js';
+import { getSession, setSession, clearSession } from './lib/session.js';
 import { config } from './config.js';
 import { h } from './lib/dom.js';
 import { bestKeyScore, buildAliasIndex, normalize, AUTO_MATCH_THRESHOLD } from './lib/match.js';
@@ -906,21 +907,30 @@ async function loadMore() {
 
 async function signIn(token, { silent = false } = {}) {
   if (!token) {
+    clearSession();
     showLogin();
     return;
   }
-  showBoot(silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…');
-  let authenticated = false;
+  const cached = silent ? getSession() : null;
+  let authenticated = Boolean(cached);
+  showBoot(cached
+    ? '正在加载审核数据…'
+    : (silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…'));
   try {
     const client = createClient(token);
     const api = createApi(token);
-    const me = await api.me();
-    authenticated = true;
+    let login = cached?.login || '';
+    if (!cached) {
+      const me = await api.me();
+      login = me.login;
+      authenticated = true;
+      setSession(login);
+    }
 
     setToken(token);
     state.client = client;
     state.api = api;
-    userLabel.textContent = `@${me.login}`;
+    userLabel.textContent = login ? `@${login}` : '';
     showBoot('登录有效，正在加载审核数据…');
     await loadData();
     startOverviewPolling();
@@ -933,6 +943,7 @@ async function signIn(token, { silent = false } = {}) {
     state.api = null;
     if (error.status === 401) {
       clearToken();
+      clearSession();
       showLogin(describeError(error));
       return;
     }
@@ -947,6 +958,7 @@ async function signIn(token, { silent = false } = {}) {
 function signOut(message = '') {
   stopOverviewPolling();
   clearToken();
+  clearSession();
   state.client = null;
   state.api = null;
   state.pending = [];
@@ -1231,6 +1243,7 @@ bootRetry.addEventListener('click', () => {
 });
 bootLogin.addEventListener('click', () => {
   clearToken();
+  clearSession();
   showLogin();
   tokenInput.focus();
 });
@@ -1337,4 +1350,7 @@ newProjectId.addEventListener('input', () => { newProjectId.dataset.touched = '1
 
 const savedToken = getToken();
 if (savedToken) signIn(savedToken, { silent: true });
-else showLogin();
+else {
+  clearSession();
+  showLogin();
+}

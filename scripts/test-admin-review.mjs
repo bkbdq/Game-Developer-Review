@@ -19,6 +19,7 @@ import {
   companyContentChanged,
   newProjectId,
 } from '../admin/lib/published.js';
+import { getSession, setSession, clearSession } from '../admin/lib/session.js';
 
 let passed = 0;
 const failures = [];
@@ -187,6 +188,18 @@ check('公司内容变化可识别', companyContentChanged(companyOriginal, comp
 const generatedId = newProjectId('测试项目', new Set());
 check('新项目 ID 以 p_ 开头', generatedId.startsWith('p_'), true);
 check('项目 ID 冲突追加序号', newProjectId('测试项目', new Set([generatedId])), `${generatedId}-2`);
+
+// ── 登录会话缓存 ─────────────────────────────────────────────────────────
+const sessionStore = new Map();
+globalThis.sessionStorage = {
+  getItem: key => (sessionStore.has(key) ? sessionStore.get(key) : null),
+  setItem: (key, value) => { sessionStore.set(key, String(value)); },
+  removeItem: key => { sessionStore.delete(key); },
+};
+setSession('tester');
+check('会话缓存读取登录名', getSession()?.login, 'tester');
+clearSession();
+check('会话缓存可清除', getSession(), null);
 
 if (failures.length) {
   console.error(`✗ ${failures.length} 项失败：`);

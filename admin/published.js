@@ -1,6 +1,7 @@
 import { createClient } from './lib/github.js';
 import { createApi } from './lib/api.js';
 import { getToken, setToken, clearToken } from './lib/token.js';
+import { getSession, setSession, clearSession } from './lib/session.js';
 import { config } from './config.js';
 import { h } from './lib/dom.js';
 import { scanDraft } from './lib/sensitive.js';
@@ -50,6 +51,7 @@ const companySlugInput = $('#company-field-slug');
 const companyAliasesInput = $('#company-field-aliases');
 const projectRows = $('#project-rows');
 const addProjectButton = $('#add-project-button');
+const saveCompanyButton = $('#save-company-button');
 const resetCompanyButton = $('#reset-company-button');
 const companyStatus = $('#company-status');
 const reviewCountLabel = $('#review-count');
@@ -82,6 +84,7 @@ const state = {
   editingId: null,
   companyDirty: false,
   reviewDirty: false,
+  loading: false,
   busy: false,
 };
 
@@ -134,6 +137,30 @@ function currentCompany() {
 
 function currentReviews() {
   return state.selectedId ? state.reviews.get(state.selectedId) || new Map() : new Map();
+}
+
+/**
+ * 加载公司 / 评价期间锁住数据交互：表单、项目行、保存还原、重载与左侧列表。
+ * 使用 inert 阻断键盘与指针操作，再显式禁用关键按钮，避免出现“可点但无效”的状态。
+ */
+function setDataLoading(loading) {
+  state.loading = loading;
+  companyDetail.setAttribute('aria-busy', String(loading));
+  companyForm.inert = loading;
+  reviewList.inert = loading;
+  companyList.classList.toggle('is-loading', loading);
+  companyList.setAttribute('aria-busy', String(loading));
+  [
+    filterInput,
+    companyNameInput,
+    companySlugInput,
+    companyAliasesInput,
+    addProjectButton,
+    saveCompanyButton,
+    resetCompanyButton,
+    reloadReviewsButton,
+    refreshButton,
+  ].forEach(element => { element.disabled = loading; });
 }
 
 function confirmDiscard() {
@@ -726,6 +753,7 @@ async function selectCompany(companyId) {
   state.companyDirty = false;
   state.reviewDirty = false;
   reviewForm.hidden = true;
+  setDataLoading(true);
   setStatus(companyStatus, '');
   setStatus(reviewStatus, '');
   renderCompanyList();
@@ -753,6 +781,7 @@ async function selectCompany(companyId) {
     handleError(error);
   } finally {
     state.busy = false;
+    setDataLoading(false);
   }
 }
 
@@ -764,6 +793,7 @@ async function reloadReviews() {
   state.editingId = null;
   state.reviewDirty = false;
   reviewForm.hidden = true;
+  setDataLoading(true);
   setStatus(companyStatus, '正在重新加载评价…');
   try {
     state.reviews.delete(companyId);
@@ -776,6 +806,7 @@ async function reloadReviews() {
     handleSaveError(error, companyStatus);
   } finally {
     state.busy = false;
+    setDataLoading(false);
   }
 }
 
@@ -783,21 +814,30 @@ async function reloadReviews() {
 
 async function signIn(token, { silent = false } = {}) {
   if (!token) {
+    clearSession();
     showLogin();
     return;
   }
-  showBoot(silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…');
-  let authenticated = false;
+  const cached = silent ? getSession() : null;
+  let authenticated = Boolean(cached);
+  showBoot(cached
+    ? '正在读取已展示数据…'
+    : (silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…'));
   try {
     const client = createClient(token);
     const api = createApi(token);
-    const me = await api.me();
-    authenticated = true;
+    let login = cached?.login || '';
+    if (!cached) {
+      const me = await api.me();
+      login = me.login;
+      authenticated = true;
+      setSession(login);
+    }
 
     setToken(token);
     state.client = client;
     state.api = api;
-    userLabel.textContent = `@${me.login}`;
+    userLabel.textContent = login ? `@${login}` : '';
     showBoot('登录有效，正在读取已展示数据…');
     await loadData();
     showApp();
@@ -808,6 +848,7 @@ async function signIn(token, { silent = false } = {}) {
     state.api = null;
     if (error.status === 401) {
       clearToken();
+      clearSession();
       showLogin(describeError(error));
       return;
     }
@@ -821,6 +862,7 @@ async function signIn(token, { silent = false } = {}) {
 
 function signOut(message = '') {
   clearToken();
+  clearSession();
   state.client = null;
   state.api = null;
   state.companies = new Map();
@@ -854,6 +896,7 @@ bootRetry.addEventListener('click', () => {
 });
 bootLogin.addEventListener('click', () => {
   clearToken();
+  clearSession();
   showLogin();
   tokenInput.focus();
 });
@@ -896,4 +939,7 @@ window.addEventListener('beforeunload', event => {
 
 const savedToken = getToken();
 if (savedToken) signIn(savedToken, { silent: true });
-else showLogin();
+else {
+  clearSession();
+  showLogin();
+}

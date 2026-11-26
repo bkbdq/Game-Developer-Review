@@ -10,6 +10,16 @@ import {
 } from '../admin/lib/sensitive.js';
 import { similarity, findSimilar } from '../admin/lib/similar.js';
 import { buildReview, validateDraft } from '../admin/lib/review.js';
+import {
+  parseAliases,
+  composeReview,
+  reviewContentChanged,
+  referencedProjectIds,
+  composeCompany,
+  companyContentChanged,
+  newProjectId,
+} from '../admin/lib/published.js';
+import { getSession, setSession, clearSession } from '../admin/lib/session.js';
 
 let passed = 0;
 const failures = [];
@@ -96,6 +106,100 @@ check('在职时长四区间通过', validateDraft(
 check('非法时长报错', validateDraft(
   { companyId: 'c_x', projectId: '', projectAnonymous: true, score: 3, comment: 'ok', publishedAt: '2026-11-21', profile: { tenure: 'abc' }, tags: [] },
   { taxonomy, company }).some(message => message.includes('司龄')), true);
+
+// ── 已展示数据修正 ───────────────────────────────────────────────────────
+check('别名中英文逗号拆分去重', parseAliases('米哈游，miHoYo, 米哈游\n'), ['米哈游', 'miHoYo']);
+
+const publishedOriginal = {
+  schemaVersion: 1,
+  id: 'rv_pub1',
+  companyId: 'c_x',
+  projectId: 'p_x',
+  score: 3,
+  title: '旧标题',
+  comment: '旧正文',
+  profile: { tenure: 'lt1y', role: 'program' },
+  tags: ['overtime'],
+  publishedAt: '2026-11-01',
+  revision: 1,
+};
+const publishedNext = composeReview(publishedOriginal, {
+  score: 4,
+  title: '',
+  comment: '新正文',
+  projectId: '',
+  projectAnonymous: true,
+  tenure: '1-3y',
+  tags: ['management'],
+  publishedAt: '2026-11-02',
+});
+check('修正递增 revision', publishedNext.revision, 2);
+check('修正为匿名项目移除 projectId', publishedNext.projectId, undefined);
+check('修正为匿名项目写入标记', publishedNext.projectAnonymous, true);
+check('修正清空标题', publishedNext.title, undefined);
+check('修正保留画像其他字段', publishedNext.profile.role, 'program');
+check('修正更新在职时长', publishedNext.profile.tenure, '1-3y');
+check('修正替换标签', JSON.stringify(publishedNext.tags), JSON.stringify(['management']));
+check('内容变化可识别', reviewContentChanged(publishedOriginal, publishedNext), true);
+check('仅 revision 变化不算改动', reviewContentChanged(publishedOriginal, { ...publishedOriginal, revision: 9 }), false);
+
+const publishedProject = composeReview(publishedOriginal, {
+  score: 3,
+  title: '旧标题',
+  comment: '旧正文',
+  projectId: 'p_y',
+  projectAnonymous: false,
+  tenure: 'lt1y',
+  tags: ['overtime'],
+  publishedAt: '2026-11-01',
+});
+check('修正项目保留 projectId', publishedProject.projectId, 'p_y');
+check('修正项目移除匿名标记', publishedProject.projectAnonymous, undefined);
+
+check('引用项目去重', [...referencedProjectIds([
+  { projectId: 'p_x' }, { projectId: 'p_x' }, {}, { projectId: 'p_y' },
+])].sort(), ['p_x', 'p_y']);
+
+const companyOriginal = {
+  schemaVersion: 1,
+  id: 'c_x',
+  slug: 'x',
+  name: '旧名',
+  aliases: ['别名'],
+  projects: [{ id: 'p_x', name: '项目', status: 'live', genre: 'rpg' }],
+  createdAt: '2026-01-01',
+  updatedAt: '2026-01-01',
+};
+const companyNext = composeCompany(companyOriginal, {
+  name: '新名',
+  slug: 'x-new',
+  aliases: ['别名', '新别名'],
+  projects: [
+    { id: 'p_x', name: '项目改名', status: 'dev', genre: 'rpg' },
+    { id: 'p_y', name: '新项目', status: 'unknown' },
+  ],
+}, '2026-11-26');
+check('公司更新名称与 slug', [companyNext.name, companyNext.slug], ['新名', 'x-new']);
+check('公司项目保留扩展字段', companyNext.projects[0].genre, 'rpg');
+check('公司 updatedAt 更新', companyNext.updatedAt, '2026-11-26');
+check('公司仅 updatedAt 变化不算改动', companyContentChanged(companyOriginal, { ...companyOriginal, updatedAt: '2026-11-26' }), false);
+check('公司内容变化可识别', companyContentChanged(companyOriginal, companyNext), true);
+
+const generatedId = newProjectId('测试项目', new Set());
+check('新项目 ID 以 p_ 开头', generatedId.startsWith('p_'), true);
+check('项目 ID 冲突追加序号', newProjectId('测试项目', new Set([generatedId])), `${generatedId}-2`);
+
+// ── 登录会话缓存 ─────────────────────────────────────────────────────────
+const sessionStore = new Map();
+globalThis.sessionStorage = {
+  getItem: key => (sessionStore.has(key) ? sessionStore.get(key) : null),
+  setItem: (key, value) => { sessionStore.set(key, String(value)); },
+  removeItem: key => { sessionStore.delete(key); },
+};
+setSession('tester');
+check('会话缓存读取登录名', getSession()?.login, 'tester');
+clearSession();
+check('会话缓存可清除', getSession(), null);
 
 if (failures.length) {
   console.error(`✗ ${failures.length} 项失败：`);

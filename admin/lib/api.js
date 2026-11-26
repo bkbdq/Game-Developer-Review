@@ -8,29 +8,42 @@ export class ApiError extends Error {
 }
 
 const DEFAULT_BASE = '/api/admin';
+const DEFAULT_TIMEOUT = 15000;
 
 export function createApi(token, base = DEFAULT_BASE) {
   if (!token) throw new Error('缺少登录凭证');
 
-  async function request(path, { method = 'GET', body } = {}) {
-    const response = await fetch(base + path, {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(body ? { 'Content-Type': 'application/json' } : {}),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+  async function request(path, { method = 'GET', body, timeout = DEFAULT_TIMEOUT } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(base + path, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
 
-    const text = await response.text();
-    let data = null;
-    if (text) {
-      try { data = JSON.parse(text); } catch { data = { message: text }; }
+      const text = await response.text();
+      let data = null;
+      if (text) {
+        try { data = JSON.parse(text); } catch { data = { message: text }; }
+      }
+      if (!response.ok) {
+        throw new ApiError(data?.message || `HTTP ${response.status}`, response.status, data);
+      }
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new ApiError('请求超时，请检查网络后重试。', 0);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
-    if (!response.ok) {
-      throw new ApiError(data?.message || `HTTP ${response.status}`, response.status, data);
-    }
-    return data;
   }
 
   return {

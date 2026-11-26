@@ -1,5 +1,6 @@
 import { createApi, ApiError } from './lib/api.js';
 import { getToken, setToken, clearToken } from './lib/token.js';
+import { getSession, setSession, clearSession } from './lib/session.js';
 import { createClient } from './lib/github.js';
 import { config } from './config.js';
 import { h } from './lib/dom.js';
@@ -8,6 +9,11 @@ const TYPE_LABEL = { deletion: '删除', correction: '更正' };
 const STATUS_LABEL = { received: '已收到', processed: '已处理', rejected: '已驳回', handled: '已处理' };
 
 const $ = selector => document.querySelector(selector);
+const bootView = $('#boot-view');
+const bootStatus = $('#boot-status');
+const bootActions = $('#boot-actions');
+const bootRetry = $('#boot-retry');
+const bootLogin = $('#boot-login');
 const loginView = $('#login-view');
 const loginForm = $('#login-form');
 const tokenInput = $('#token');
@@ -41,6 +47,30 @@ tabContacts.classList.toggle('active', initialTab === 'contacts');
 function setStatus(element, message, isError = false) {
   element.textContent = message || '';
   element.classList.toggle('error', Boolean(isError));
+}
+
+function showBoot(message, { error = false } = {}) {
+  bootView.hidden = false;
+  bootActions.hidden = !error;
+  loginView.hidden = true;
+  appView.hidden = true;
+  logoutButton.hidden = true;
+  setStatus(bootStatus, message || '正在验证登录状态…', error);
+}
+
+function showLogin(message = '') {
+  bootView.hidden = true;
+  loginView.hidden = false;
+  appView.hidden = true;
+  logoutButton.hidden = true;
+  setStatus(loginStatus, message, Boolean(message));
+}
+
+function showApp() {
+  bootView.hidden = true;
+  loginView.hidden = true;
+  appView.hidden = false;
+  logoutButton.hidden = false;
 }
 
 function describeError(error) {
@@ -309,42 +339,64 @@ function handleError(error) {
 }
 
 async function signIn(token, { silent = false } = {}) {
-  if (!silent) setStatus(loginStatus, '正在验证 token…');
+  if (!token) {
+    clearSession();
+    showLogin();
+    return;
+  }
+  const cached = silent ? getSession() : null;
+  let authenticated = Boolean(cached);
+  showBoot(cached
+    ? '正在加载队列…'
+    : (silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…'));
   try {
     const api = createApi(token);
-    const me = await api.me();
+    const client = createClient(token);
+    let login = cached?.login || '';
+    if (!cached) {
+      const me = await api.me();
+      login = me.login;
+      authenticated = true;
+      setSession(login);
+    }
     setToken(token);
     state.api = api;
-    state.client = createClient(token);
-    state.login = me.login;
-    userLabel.textContent = `@${me.login}`;
-    loginView.hidden = true;
-    appView.hidden = false;
-    logoutButton.hidden = false;
-    setStatus(loginStatus, '');
+    state.client = client;
+    state.login = login;
+    userLabel.textContent = login ? `@${login}` : '';
+    showBoot('登录有效，正在加载队列…');
     await loadItems();
+    showApp();
+    setStatus(loginStatus, '');
   } catch (error) {
-    if (error.status === 401 || error.status === 403) clearToken();
     state.api = null;
     state.client = null;
-    setStatus(loginStatus, describeError(error), true);
+    if (error.status === 401) {
+      clearToken();
+      clearSession();
+      showLogin(describeError(error));
+      return;
+    }
+    if (!silent && !authenticated) {
+      showLogin(describeError(error));
+      return;
+    }
+    showBoot(describeError(error), { error: true });
   }
 }
 
 function signOut(message = '') {
   clearToken();
+  clearSession();
   state.api = null;
   state.client = null;
   state.items = [];
   state.selected = null;
-  loginView.hidden = false;
-  appView.hidden = true;
-  logoutButton.hidden = true;
   userLabel.textContent = '';
   queueList.replaceChildren();
   queueCount.textContent = '';
   queueDetail.replaceChildren(h('div', { class: 'empty' }, '选择左侧一条记录'));
-  setStatus(loginStatus, message, Boolean(message));
+  showLogin(message);
   setStatus(globalStatus, '');
 }
 
@@ -353,9 +405,24 @@ loginForm.addEventListener('submit', event => {
   signIn(tokenInput.value.trim());
 });
 logoutButton.addEventListener('click', () => signOut());
+bootRetry.addEventListener('click', () => {
+  const token = getToken();
+  if (token) signIn(token, { silent: true });
+  else showLogin();
+});
+bootLogin.addEventListener('click', () => {
+  clearToken();
+  clearSession();
+  showLogin();
+  tokenInput.focus();
+});
 tabRequests.addEventListener('click', () => setTab('requests'));
 tabContacts.addEventListener('click', () => setTab('contacts'));
 refreshButton.addEventListener('click', () => loadItems().catch(handleError));
 
 const saved = getToken();
 if (saved) signIn(saved, { silent: true });
+else {
+  clearSession();
+  showLogin();
+}

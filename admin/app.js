@@ -31,6 +31,11 @@ const CHECKLIST_COUNT = 4;
 const SIMILAR_THRESHOLD = 0.75;
 
 const $ = selector => document.querySelector(selector);
+const bootView = $('#boot-view');
+const bootStatus = $('#boot-status');
+const bootActions = $('#boot-actions');
+const bootRetry = $('#boot-retry');
+const bootLogin = $('#boot-login');
 const loginView = $('#login-view');
 const loginForm = $('#login-form');
 const tokenInput = $('#token');
@@ -126,6 +131,30 @@ const state = {
 function setStatus(element, message, isError = false) {
   element.textContent = message || '';
   element.classList.toggle('error', Boolean(isError));
+}
+
+function showBoot(message, { error = false } = {}) {
+  bootView.hidden = false;
+  bootActions.hidden = !error;
+  loginView.hidden = true;
+  appView.hidden = true;
+  logoutButton.hidden = true;
+  setStatus(bootStatus, message || '正在验证登录状态…', error);
+}
+
+function showLogin(message = '') {
+  bootView.hidden = true;
+  loginView.hidden = false;
+  appView.hidden = true;
+  logoutButton.hidden = true;
+  setStatus(loginStatus, message, Boolean(message));
+}
+
+function showApp() {
+  bootView.hidden = true;
+  loginView.hidden = true;
+  appView.hidden = false;
+  logoutButton.hidden = false;
 }
 
 function renderOverview() {
@@ -876,29 +905,42 @@ async function loadMore() {
 }
 
 async function signIn(token, { silent = false } = {}) {
-  if (!silent) setStatus(loginStatus, '正在验证 token…');
+  if (!token) {
+    showLogin();
+    return;
+  }
+  showBoot(silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…');
+  let authenticated = false;
   try {
     const client = createClient(token);
     const api = createApi(token);
     const me = await api.me();
+    authenticated = true;
 
     setToken(token);
     state.client = client;
     state.api = api;
+    userLabel.textContent = `@${me.login}`;
+    showBoot('登录有效，正在加载审核数据…');
     await loadData();
     startOverviewPolling();
 
-    loginView.hidden = true;
-    appView.hidden = false;
-    logoutButton.hidden = false;
-    userLabel.textContent = `@${me.login}`;
+    showApp();
     setStatus(loginStatus, '');
     setStatus(globalStatus, `已加载 ${state.pending.length} 条待审提交`);
   } catch (error) {
-    if (error.status === 401 || error.status === 403) clearToken();
     state.client = null;
     state.api = null;
-    setStatus(loginStatus, describeError(error), true);
+    if (error.status === 401) {
+      clearToken();
+      showLogin(describeError(error));
+      return;
+    }
+    if (!silent && !authenticated) {
+      showLogin(describeError(error));
+      return;
+    }
+    showBoot(describeError(error), { error: true });
   }
 }
 
@@ -916,15 +958,12 @@ function signOut(message = '') {
   state.selected = null;
   state.selectedId = null;
   state.reviewId = null;
-  loginView.hidden = false;
-  appView.hidden = true;
-  logoutButton.hidden = true;
   userLabel.textContent = '';
   pendingList.replaceChildren();
   pendingCount.textContent = '';
   reviewForm.hidden = true;
   detailEmpty.hidden = false;
-  setStatus(loginStatus, message, Boolean(message));
+  showLogin(message);
   setStatus(globalStatus, '');
 }
 
@@ -1185,6 +1224,16 @@ loginForm.addEventListener('submit', event => {
   event.preventDefault();
   signIn(tokenInput.value.trim());
 });
+bootRetry.addEventListener('click', () => {
+  const token = getToken();
+  if (token) signIn(token, { silent: true });
+  else showLogin();
+});
+bootLogin.addEventListener('click', () => {
+  clearToken();
+  showLogin();
+  tokenInput.focus();
+});
 
 async function triggerRemoteDeploy() {
   try {
@@ -1288,3 +1337,4 @@ newProjectId.addEventListener('input', () => { newProjectId.dataset.touched = '1
 
 const savedToken = getToken();
 if (savedToken) signIn(savedToken, { silent: true });
+else showLogin();

@@ -13,6 +13,8 @@ const ACTION_OPTIONS = [
   ['correct', '更正评价'],
   ['request_rejected', '驳回申请'],
   ['contact_handled', '联系已处理'],
+  ['published_edit', '修正已展示'],
+  ['published_delete', '删除已展示'],
   ['deploy_showcase', '更新展示站'],
   ['login_success', '登录成功'],
   ['login_denied', '登录失败'],
@@ -30,6 +32,11 @@ const TARGET_LABEL = {
 };
 
 const $ = selector => document.querySelector(selector);
+const bootView = $('#boot-view');
+const bootStatus = $('#boot-status');
+const bootActions = $('#boot-actions');
+const bootRetry = $('#boot-retry');
+const bootLogin = $('#boot-login');
 const loginView = $('#login-view');
 const loginForm = $('#login-form');
 const tokenInput = $('#token');
@@ -65,6 +72,30 @@ ACTION_OPTIONS.forEach(([value, label]) => {
 function setStatus(element, message, isError = false) {
   element.textContent = message || '';
   element.classList.toggle('error', Boolean(isError));
+}
+
+function showBoot(message, { error = false } = {}) {
+  bootView.hidden = false;
+  bootActions.hidden = !error;
+  loginView.hidden = true;
+  appView.hidden = true;
+  logoutButton.hidden = true;
+  setStatus(bootStatus, message || '正在验证登录状态…', error);
+}
+
+function showLogin(message = '') {
+  bootView.hidden = true;
+  loginView.hidden = false;
+  appView.hidden = true;
+  logoutButton.hidden = true;
+  setStatus(loginStatus, message, Boolean(message));
+}
+
+function showApp() {
+  bootView.hidden = true;
+  loginView.hidden = true;
+  appView.hidden = false;
+  logoutButton.hidden = false;
 }
 
 function describeError(error) {
@@ -154,23 +185,36 @@ async function load() {
 }
 
 async function signIn(token, { silent = false } = {}) {
-  if (!silent) setStatus(loginStatus, '正在验证 token…');
+  if (!token) {
+    showLogin();
+    return;
+  }
+  showBoot(silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…');
+  let authenticated = false;
   try {
     const api = createApi(token);
     const me = await api.me();
+    authenticated = true;
     setToken(token);
     state.api = api;
     state.login = me.login;
     userLabel.textContent = `@${me.login}`;
-    loginView.hidden = true;
-    appView.hidden = false;
-    logoutButton.hidden = false;
-    setStatus(loginStatus, '');
+    showBoot('登录有效，正在加载审计日志…');
     await load();
+    showApp();
+    setStatus(loginStatus, '');
   } catch (error) {
-    if (error.status === 401 || error.status === 403) clearToken();
     state.api = null;
-    setStatus(loginStatus, describeError(error), true);
+    if (error.status === 401) {
+      clearToken();
+      showLogin(describeError(error));
+      return;
+    }
+    if (!silent && !authenticated) {
+      showLogin(describeError(error));
+      return;
+    }
+    showBoot(describeError(error), { error: true });
   }
 }
 
@@ -179,14 +223,11 @@ function signOut(message = '') {
   state.api = null;
   state.items = [];
   state.offset = 0;
-  loginView.hidden = false;
-  appView.hidden = true;
-  logoutButton.hidden = true;
   userLabel.textContent = '';
   rowsBody.replaceChildren();
   countLabel.textContent = '';
   pageInfo.textContent = '';
-  setStatus(loginStatus, message, Boolean(message));
+  showLogin(message);
   setStatus(globalStatus, '');
 }
 
@@ -195,6 +236,16 @@ loginForm.addEventListener('submit', event => {
   signIn(tokenInput.value.trim());
 });
 logoutButton.addEventListener('click', () => signOut());
+bootRetry.addEventListener('click', () => {
+  const token = getToken();
+  if (token) signIn(token, { silent: true });
+  else showLogin();
+});
+bootLogin.addEventListener('click', () => {
+  clearToken();
+  showLogin();
+  tokenInput.focus();
+});
 searchButton.addEventListener('click', () => {
   state.offset = 0;
   load();
@@ -218,3 +269,4 @@ nextButton.addEventListener('click', () => {
 
 const saved = getToken();
 if (saved) signIn(saved, { silent: true });
+else showLogin();

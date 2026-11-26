@@ -1,5 +1,6 @@
 import { createApi, ApiError } from './lib/api.js';
 import { getToken, setToken, clearToken } from './lib/token.js';
+import { getSession, setSession, clearSession } from './lib/session.js';
 import { createClient } from './lib/github.js';
 import { config } from './config.js';
 import { h } from './lib/dom.js';
@@ -339,20 +340,30 @@ function handleError(error) {
 
 async function signIn(token, { silent = false } = {}) {
   if (!token) {
+    clearSession();
     showLogin();
     return;
   }
-  showBoot(silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…');
-  let authenticated = false;
+  const cached = silent ? getSession() : null;
+  let authenticated = Boolean(cached);
+  showBoot(cached
+    ? '正在加载队列…'
+    : (silent ? '正在验证登录状态，无需重新输入 token…' : '正在登录…'));
   try {
     const api = createApi(token);
-    const me = await api.me();
-    authenticated = true;
+    const client = createClient(token);
+    let login = cached?.login || '';
+    if (!cached) {
+      const me = await api.me();
+      login = me.login;
+      authenticated = true;
+      setSession(login);
+    }
     setToken(token);
     state.api = api;
-    state.client = createClient(token);
-    state.login = me.login;
-    userLabel.textContent = `@${me.login}`;
+    state.client = client;
+    state.login = login;
+    userLabel.textContent = login ? `@${login}` : '';
     showBoot('登录有效，正在加载队列…');
     await loadItems();
     showApp();
@@ -362,6 +373,7 @@ async function signIn(token, { silent = false } = {}) {
     state.client = null;
     if (error.status === 401) {
       clearToken();
+      clearSession();
       showLogin(describeError(error));
       return;
     }
@@ -375,6 +387,7 @@ async function signIn(token, { silent = false } = {}) {
 
 function signOut(message = '') {
   clearToken();
+  clearSession();
   state.api = null;
   state.client = null;
   state.items = [];
@@ -399,6 +412,7 @@ bootRetry.addEventListener('click', () => {
 });
 bootLogin.addEventListener('click', () => {
   clearToken();
+  clearSession();
   showLogin();
   tokenInput.focus();
 });
@@ -408,4 +422,7 @@ refreshButton.addEventListener('click', () => loadItems().catch(handleError));
 
 const saved = getToken();
 if (saved) signIn(saved, { silent: true });
-else showLogin();
+else {
+  clearSession();
+  showLogin();
+}

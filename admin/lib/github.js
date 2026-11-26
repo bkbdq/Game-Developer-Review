@@ -1,4 +1,5 @@
 const API_BASE = 'https://api.github.com';
+const DEFAULT_TIMEOUT = 20000;
 
 export class GitHubError extends Error {
   constructor(message, status, body) {
@@ -43,21 +44,33 @@ export function createClient(token, fetchImpl = fetch) {
     'User-Agent': 'gdr-admin',
   };
 
-  async function request(path, { method = 'GET', body } = {}) {
-    const response = await fetchImpl(API_BASE + path, {
-      method,
-      headers: body ? { ...headers, 'Content-Type': 'application/json' } : headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const text = await response.text();
-    let data = null;
-    if (text) {
-      try { data = JSON.parse(text); } catch { data = text; }
+  async function request(path, { method = 'GET', body, timeout = DEFAULT_TIMEOUT } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetchImpl(API_BASE + path, {
+        method,
+        headers: body ? { ...headers, 'Content-Type': 'application/json' } : headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+      const text = await response.text();
+      let data = null;
+      if (text) {
+        try { data = JSON.parse(text); } catch { data = text; }
+      }
+      if (!response.ok) {
+        throw new GitHubError(data?.message || `HTTP ${response.status}`, response.status, data);
+      }
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new GitHubError('请求 GitHub 超时，请检查网络或代理后重试。', 0, null);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
-    if (!response.ok) {
-      throw new GitHubError(data?.message || `HTTP ${response.status}`, response.status, data);
-    }
-    return data;
   }
 
   return {

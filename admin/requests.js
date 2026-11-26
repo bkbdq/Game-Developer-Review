@@ -1,9 +1,9 @@
 import { createApi, ApiError } from './lib/api.js';
+import { getToken, setToken, clearToken } from './lib/token.js';
 import { createClient } from './lib/github.js';
 import { config } from './config.js';
 import { h } from './lib/dom.js';
 
-const TOKEN_KEY = 'gdr.admin.token';
 const TYPE_LABEL = { deletion: '删除', correction: '更正' };
 const STATUS_LABEL = { received: '已收到', processed: '已处理', rejected: '已驳回', handled: '已处理' };
 
@@ -313,7 +313,7 @@ async function signIn(token, { silent = false } = {}) {
   try {
     const api = createApi(token);
     const me = await api.me();
-    sessionStorage.setItem(TOKEN_KEY, token);
+    setToken(token);
     state.api = api;
     state.client = createClient(token);
     state.login = me.login;
@@ -324,7 +324,7 @@ async function signIn(token, { silent = false } = {}) {
     setStatus(loginStatus, '');
     await loadItems();
   } catch (error) {
-    sessionStorage.removeItem(TOKEN_KEY);
+    if (error.status === 401 || error.status === 403) clearToken();
     state.api = null;
     state.client = null;
     setStatus(loginStatus, describeError(error), true);
@@ -332,7 +332,7 @@ async function signIn(token, { silent = false } = {}) {
 }
 
 function signOut(message = '') {
-  sessionStorage.removeItem(TOKEN_KEY);
+  clearToken();
   state.api = null;
   state.client = null;
   state.items = [];
@@ -357,5 +357,5 @@ tabRequests.addEventListener('click', () => setTab('requests'));
 tabContacts.addEventListener('click', () => setTab('contacts'));
 refreshButton.addEventListener('click', () => loadItems().catch(handleError));
 
-const saved = sessionStorage.getItem(TOKEN_KEY);
+const saved = getToken();
 if (saved) signIn(saved, { silent: true });

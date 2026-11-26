@@ -57,7 +57,7 @@
 ## M3 审核控制台（需求 M4）
 
 - [x] 登录失效、网络失败、发布失败分别提示并给出下一步动作
-- [x] `admin/` 静态 SPA 与管理员登录（PAT、sessionStorage、服务端权限校验）
+- [x] `admin/` 静态 SPA 与管理员登录（PAT、cookie 30 天免登录、服务端权限校验）
 - [x] 控制台 Pages Functions API：登录校验、待审列表、通过、拒绝、审计
 - [x] 待审列表、详情、公司 / 项目匹配、脱敏编辑
 - [x] 公司 / 项目可搜索选择与模糊匹配（内置常见游戏公司 / 项目别名库 `admin/lib/aliases.json`，`npm run test:admin`）

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_nwdva3o",
+  "slug": "nwdva3o",
+  "name": "柚子猫",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_ntpgeq7",
+      "name": "戴森球计划",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-26",
+  "updatedAt": "2026-11-26"
+}

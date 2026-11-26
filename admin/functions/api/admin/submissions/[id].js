@@ -18,6 +18,7 @@ export async function onRequestPost({ request, env, params }) {
       id: params.id,
       reviewId: String(body.reviewId || ''),
       companyId: String(body.companyId || ''),
+      commitSha: String(body.commitSha || ''),
       reviewer: session.login,
     });
     if (!result.ok) return json({ ok: false, message: result.message || statusMessage(result) }, result.status);

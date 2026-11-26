@@ -19,6 +19,7 @@ export async function onRequestPost({ request, env, params }) {
     note: String(body?.note || ''),
     reviewId: String(body?.reviewId || ''),
     companyId: String(body?.companyId || ''),
+    commitSha: String(body?.commitSha || ''),
     reviewer: session.login,
   });
 

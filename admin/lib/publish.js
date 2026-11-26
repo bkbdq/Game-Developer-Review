@@ -77,6 +77,7 @@ export async function publishReviews({ client, config, items }) {
       return {
         published: fresh.map(({ review }) => review.id),
         skipped: items.filter(item => !fresh.includes(item)).map(({ review }) => review.id),
+        commitSha: commit.sha,
       };
     } catch (error) {
       if (error.status === 409 && attempt === 0) continue;
@@ -97,5 +98,6 @@ export async function publishReview({ client, config, review, company }) {
     reviewPath: `${reviewsDir}/${review.companyId}/${review.id}.json`,
     companyPath: `${companiesDir}/${company.id}.json`,
     published: result.published.length > 0,
+    commitSha: result.commitSha,
   };
 }

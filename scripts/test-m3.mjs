@@ -16,6 +16,7 @@ import {
   listSubmissions,
   approveSubmission,
   rejectSubmission,
+  listAuditLog,
 } from '../admin/functions/_lib/store.js';
 
 const taxonomy = {
@@ -136,6 +137,7 @@ class TestDb {
   constructor() {
     this.db = new DatabaseSync(':memory:');
     this.db.exec(readFileSync(new URL('../survey/migrations/0001_submissions.sql', import.meta.url), 'utf8'));
+    this.db.exec(readFileSync(new URL('../survey/migrations/0003_audit_log_enhance.sql', import.meta.url), 'utf8'));
   }
   prepare(sql) {
     const statement = this.db.prepare(sql);
@@ -174,9 +176,20 @@ assert.deepEqual(pending.items[1].flags, ['fast_submit']);
 assert.equal((await approveSubmission(db, { id: pending.items[0].id, reviewId: 'bad', companyId: 'c_x', reviewer: 'devA' })).code, 'invalid');
 assert.equal((await approveSubmission(db, { id: '33333333-3333-4333-8333-333333333333', reviewId: 'rv_1', companyId: 'c_x', reviewer: 'devA' })).code, 'not_found');
 
-const approved = await approveSubmission(db, { id: pending.items[0].id, reviewId: 'rv_1', companyId: 'c_cloudcape', reviewer: 'devA' });
+const approved = await approveSubmission(db, {
+  id: pending.items[0].id,
+  reviewId: 'rv_1',
+  companyId: 'c_cloudcape',
+  reviewer: 'devA',
+  commitSha: 'abc1234',
+});
 assert.equal(approved.ok, true);
 assert.equal(db.prepare("SELECT COUNT(*) AS count FROM audit_log WHERE action = 'approve'").first().count, 1);
+const audit = await listAuditLog(db, { action: 'approve' });
+assert.equal(audit.total, 1);
+assert.equal(audit.items[0].targetType, 'review');
+assert.equal(audit.items[0].targetId, 'rv_1');
+assert.deepEqual(audit.items[0].details, { commitSha: 'abc1234' });
 assert.deepEqual(await approveSubmission(db, { id: pending.items[0].id, reviewId: 'rv_1', companyId: 'c_cloudcape', reviewer: 'devA' }), { ok: true, status: 'approved' });
 assert.equal(db.prepare("SELECT COUNT(*) AS count FROM audit_log WHERE action = 'approve'").first().count, 1);
 assert.equal((await approveSubmission(db, { id: pending.items[0].id, reviewId: 'rv_2', companyId: 'c_cloudcape', reviewer: 'devA' })).code, 'conflict');

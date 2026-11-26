@@ -33,7 +33,7 @@ export async function listSubmissions(db, { status = 'pending', limit = 50, offs
   return { items, total: total?.count || 0 };
 }
 
-export async function approveSubmission(db, { id, reviewId, companyId, reviewer }) {
+export async function approveSubmission(db, { id, reviewId, companyId, reviewer, commitSha = '' }) {
   if (!REVIEW_ID.test(reviewId || '')) return invalid('reviewId 格式不合法');
   if (!COMPANY_ID.test(companyId || '')) return invalid('companyId 格式不合法');
 
@@ -51,8 +51,17 @@ export async function approveSubmission(db, { id, reviewId, companyId, reviewer 
   if ((result.meta?.changes || 0) === 0) return conflict('pending');
 
   await db.prepare(
-    "INSERT INTO audit_log (at, action, reviewer, submission_id, review_id, company_id) VALUES (?, 'approve', ?, ?, ?, ?)",
-  ).bind(reviewedAt, reviewer, id, reviewId, companyId).run();
+    `INSERT INTO audit_log (at, action, reviewer, submission_id, review_id, company_id, result, target_type, target_id, details)
+     VALUES (?, 'approve', ?, ?, ?, ?, 'success', 'review', ?, ?)`,
+  ).bind(
+    reviewedAt,
+    reviewer,
+    id,
+    reviewId,
+    companyId,
+    reviewId,
+    commitSha ? JSON.stringify({ commitSha }) : null,
+  ).run();
 
   return { ok: true, status: 'approved' };
 }
@@ -74,8 +83,9 @@ export async function rejectSubmission(db, { id, reason, reviewer }) {
   if ((result.meta?.changes || 0) === 0) return conflict('pending');
 
   await db.prepare(
-    "INSERT INTO audit_log (at, action, reviewer, submission_id, reason) VALUES (?, 'reject', ?, ?, ?)",
-  ).bind(reviewedAt, reviewer, id, text).run();
+    `INSERT INTO audit_log (at, action, reviewer, submission_id, reason, result, target_type, target_id)
+     VALUES (?, 'reject', ?, ?, ?, 'success', 'submission', ?)`,
+  ).bind(reviewedAt, reviewer, id, text, id).run();
 
   return { ok: true, status: 'rejected' };
 }
@@ -112,7 +122,7 @@ export async function listRequests(db, { status = 'received', type = '', limit =
   return { items: (list.results || []).map(requestItem), total: total?.count || 0 };
 }
 
-export async function processRequest(db, { id, action, note, reviewer, reviewId, companyId }) {
+export async function processRequest(db, { id, action, note, reviewer, reviewId, companyId, commitSha = '' }) {
   if (!['process', 'reject'].includes(action)) return invalid('未知操作');
   const row = await db.prepare(
     'SELECT id, receipt, type, status, review_id, company_id FROM requests WHERE id = ?',
@@ -142,8 +152,8 @@ export async function processRequest(db, { id, action, note, reviewer, reviewId,
     ? 'request_rejected'
     : (row.type === 'deletion' ? 'delete' : 'correct');
   await db.prepare(
-    `INSERT INTO audit_log (at, action, reviewer, submission_id, review_id, company_id, reason)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO audit_log (at, action, reviewer, submission_id, review_id, company_id, reason, result, target_type, target_id, details)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'success', 'request', ?, ?)`,
   ).bind(
     processedAt,
     auditAction,
@@ -152,6 +162,8 @@ export async function processRequest(db, { id, action, note, reviewer, reviewId,
     nextReviewId || row.review_id || null,
     nextCompanyId || row.company_id || null,
     text || null,
+    id,
+    commitSha ? JSON.stringify({ commitSha }) : null,
   ).run();
 
   return { ok: true, status };
@@ -190,8 +202,66 @@ export async function handleContact(db, { id, reviewer, note }) {
   if ((result.meta?.changes || 0) === 0) return conflict('received');
 
   await db.prepare(
-    "INSERT INTO audit_log (at, action, reviewer, submission_id, reason) VALUES (?, 'contact_handled', ?, '', ?)",
-  ).bind(handledAt, reviewer, String(note || '').trim().slice(0, 500) || null).run();
+    `INSERT INTO audit_log (at, action, reviewer, submission_id, reason, result, target_type, target_id)
+     VALUES (?, 'contact_handled', ?, '', ?, 'success', 'contact', ?)`,
+  ).bind(handledAt, reviewer, String(note || '').trim().slice(0, 500) || null, id).run();
 
   return { ok: true, status: 'handled' };
+}
+
+function parseDetails(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+export async function listAuditLog(db, { action = '', reviewer = '', from = '', to = '', limit = 50, offset = 0 } = {}) {
+  const filters = [];
+  const binds = [];
+  if (action) {
+    filters.push('action = ?');
+    binds.push(action);
+  }
+  if (reviewer) {
+    filters.push('reviewer = ?');
+    binds.push(reviewer);
+  }
+  if (from) {
+    filters.push('at >= ?');
+    binds.push(from);
+  }
+  if (to) {
+    filters.push('at <= ?');
+    binds.push(to);
+  }
+  const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
+  const [list, total] = await Promise.all([
+    db.prepare(
+      `SELECT id, at, action, reviewer, result, target_type, target_id, submission_id, review_id, company_id, reason, details
+       FROM audit_log ${where} ORDER BY at DESC, id DESC LIMIT ? OFFSET ?`,
+    ).bind(...binds, limit, offset).all(),
+    db.prepare(`SELECT COUNT(*) AS count FROM audit_log ${where}`).bind(...binds).first(),
+  ]);
+
+  return {
+    items: (list.results || []).map(row => ({
+      id: row.id,
+      at: row.at,
+      action: row.action,
+      reviewer: row.reviewer || '',
+      result: row.result || 'success',
+      targetType: row.target_type || '',
+      targetId: row.target_id || '',
+      submissionId: row.submission_id || '',
+      reviewId: row.review_id || '',
+      companyId: row.company_id || '',
+      reason: row.reason || '',
+      details: parseDetails(row.details),
+    })),
+    total: total?.count || 0,
+  };
 }

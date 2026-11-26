@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'self'">
+  <title>审计日志 · 审核控制台</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a class="topbar-link" href="/">← 审核台</a>
+      <strong>审计日志</strong>
+      <span id="user-label"></span>
+    </div>
+    <button id="logout-button" type="button" class="ghost" hidden>退出</button>
+  </header>
+
+  <main>
+    <section id="login-view" class="panel login">
+      <h1>管理员登录</h1>
+      <p>使用与审核台相同的 GitHub PAT。token 只保存在当前标签页。</p>
+      <form id="login-form">
+        <label for="token">GitHub Token</label>
+        <input id="token" type="password" autocomplete="off" spellcheck="false" required>
+        <button type="submit">登录</button>
+      </form>
+      <p id="login-status" class="status" role="status"></p>
+    </section>
+
+    <section id="app-view" hidden>
+      <div class="toolbar audit-filters">
+        <select id="filter-action" aria-label="动作"></select>
+        <input id="filter-reviewer" type="search" placeholder="审核人 GitHub 登录名" autocomplete="off">
+        <label class="date-field">从 <input id="filter-from" type="date"></label>
+        <label class="date-field">到 <input id="filter-to" type="date"></label>
+        <button id="search-button" type="button">查询</button>
+        <button id="reset-button" type="button" class="ghost">重置</button>
+        <span id="audit-count" class="count"></span>
+      </div>
+
+      <section class="panel">
+        <div class="table-wrap">
+          <table class="audit-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>审核人</th>
+                <th>动作</th>
+                <th>对象</th>
+                <th>结果</th>
+                <th>Commit</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody id="audit-rows"></tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <button id="prev-button" type="button" class="ghost">上一页</button>
+          <span id="page-info"></span>
+          <button id="next-button" type="button" class="ghost">下一页</button>
+        </div>
+      </section>
+    </section>
+
+    <p id="global-status" class="status" role="status"></p>
+  </main>
+
+  <script type="module" src="/audit.js"></script>
+</body>
+</html>

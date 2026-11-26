@@ -55,5 +55,13 @@ export function createApi(token, base = DEFAULT_BASE) {
     handleContact: (id, payload = {}) => request(`/contacts/${encodeURIComponent(id)}`, {
       method: 'POST', body: { action: 'handle', ...payload },
     }),
+    listAudit: (params = {}) => {
+      const query = new URLSearchParams();
+      ['action', 'reviewer', 'from', 'to', 'limit', 'offset'].forEach(key => {
+        if (params[key] !== undefined && params[key] !== '') query.set(key, params[key]);
+      });
+      return request(`/audit?${query.toString()}`);
+    },
+    logEvent: payload => request('/audit', { method: 'POST', body: payload }),
   };
 }

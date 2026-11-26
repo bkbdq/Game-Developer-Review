@@ -11,6 +11,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
   workflow_dispatch:
+  repository_dispatch:
+    types: [deploy-site]
 
 permissions:
   contents: read
@@ -41,6 +43,10 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site/dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-dist
+          path: site/dist
 
   deploy:
     needs: build
@@ -51,3 +57,21 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  deploy-cloudflare:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: site/dist
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node tools/deploy-pages.mjs --project gdr-site --assets site/dist --functions site/functions --branch main

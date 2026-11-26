@@ -148,9 +148,9 @@ GitHub 的细粒度令牌不支持写别人的个人仓库，协作者请用 cla
 
 ### 更新展示站
 
-- 审核通过后会提交到 `main`，GitHub Actions 自动把正式站同步到 GitHub Pages 镜像 `github.goodcorp.games`
-- 本机配置了 `CLOUDFLARE_API_TOKEN` 时，审核台会从 `origin/main` 重新构建正式站（只读 `data/`）并部署到 Cloudflare Pages `gdr-site`，对外地址是 `goodcorp.games`
-- 没有配置 token 时只更新 GitHub Pages 镜像；Cloudflare 正式站可稍后点工具栏的「更新展示站」手动触发，或执行 `npm run deploy:site`
+- 审核通过后会提交到 `main`，GitHub Actions 的 `site-deploy` 会同时更新 GitHub Pages 镜像 `github.goodcorp.games` 和 Cloudflare 正式站 `goodcorp.games`（`gdr-site`）
+- Cloudflare 部署使用仓库加密 Secrets `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`，不会出现在源码或日志中
+- 审核台工具栏的「更新展示站」按钮常驻：本地控制台优先本机部署，失败时自动回退到 GitHub Actions；远程审核台直接触发 Actions，适合没有新数据时重试部署
 - 自动部署从 `origin/main` 拉最新数据，不会使用本地未提交的修改
 - 开发预览单独发布：在 `dev` 分支执行 `npm run deploy:dev`，构建 `data/` + `data-test/` 并部署到 `gdr-site-dev`（`dev.goodcorp.games`）
 

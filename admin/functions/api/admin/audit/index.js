@@ -4,6 +4,11 @@ import { recordAudit } from '../../../_lib/audit.js';
 
 const ACTION = /^[a-z][a-z_]{1,39}$/;
 const DEPLOY_ACTIONS = new Set(['deploy_showcase']);
+const PUBLISHED_ACTIONS = new Set(['published_edit', 'published_delete']);
+const TARGET_PATTERNS = {
+  review: /^rv_[0-9A-Za-z]+$/,
+  company: /^c_[a-z0-9_-]+$/,
+};
 
 function normalizeTime(value) {
   if (!value) return '';
@@ -45,18 +50,45 @@ export async function onRequestPost({ request, env }) {
     return fail(400, '请求体不是合法 JSON');
   }
 
-  if (!DEPLOY_ACTIONS.has(body?.action)) return fail(400, '未知操作');
+  if (DEPLOY_ACTIONS.has(body?.action)) {
+    const result = body.result === 'failed' ? 'failed' : 'success';
+    const note = String(body.note || '').slice(0, 500);
 
-  const result = body.result === 'failed' ? 'failed' : 'success';
+    await recordAudit(env.DB, {
+      action: body.action,
+      reviewer: session.login,
+      result,
+      targetType: 'deploy',
+      targetId: 'gdr-site',
+      reason: note || null,
+    });
+
+    return json({ ok: true });
+  }
+
+  if (!PUBLISHED_ACTIONS.has(body?.action)) return fail(400, '未知操作');
+
+  const targetType = body.targetType === 'company' ? 'company' : 'review';
+  const targetId = String(body.targetId || '').trim();
+  if (!TARGET_PATTERNS[targetType].test(targetId)) return fail(400, 'targetId 不合法');
+  const companyId = String(body.companyId || '').trim();
+  if (companyId && !TARGET_PATTERNS.company.test(companyId)) return fail(400, 'companyId 不合法');
+  if (targetType === 'company' && companyId && companyId !== targetId) {
+    return fail(400, 'companyId 与 targetId 不一致');
+  }
+  const commitValue = String(body.commitSha || '');
+  const commitSha = /^[0-9a-f]{7,40}$/i.test(commitValue) ? commitValue : '';
   const note = String(body.note || '').slice(0, 500);
 
   await recordAudit(env.DB, {
     action: body.action,
     reviewer: session.login,
-    result,
-    targetType: 'deploy',
-    targetId: 'gdr-site',
+    targetType,
+    targetId,
+    reviewId: targetType === 'review' ? targetId : null,
+    companyId: companyId || (targetType === 'company' ? targetId : null),
     reason: note || null,
+    details: commitSha ? { commitSha } : null,
   });
 
   return json({ ok: true });

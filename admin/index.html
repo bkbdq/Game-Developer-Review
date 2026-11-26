@@ -12,14 +12,25 @@
   <header class="topbar">
     <div class="brand"><strong>审核控制台</strong><span id="user-label"></span></div>
     <div class="topbar-actions">
-      <a class="topbar-link" href="/audit.html">审计日志</a>
+      <a class="topbar-link" href="/published.html">已展示数据</a>
       <a class="topbar-link" href="/requests.html">申请 / 联系</a>
+      <a class="topbar-link" href="/audit.html">审计日志</a>
       <button id="logout-button" type="button" class="ghost" hidden>退出</button>
     </div>
   </header>
 
   <main>
-    <section id="login-view" class="panel login">
+    <section id="boot-view" class="panel login boot" aria-live="polite">
+      <h1><span class="boot-spinner" aria-hidden="true"></span>正在进入审核控制台…</h1>
+      <p>正在确认登录状态，通常无需重新输入 token。</p>
+      <p id="boot-status" class="status" role="status">正在验证登录状态…</p>
+      <div id="boot-actions" class="actions" hidden>
+        <button id="boot-retry" type="button">重试</button>
+        <button id="boot-login" type="button" class="ghost">重新登录</button>
+      </div>
+    </section>
+
+    <section id="login-view" class="panel login" hidden>
       <h1>管理员登录</h1>
       <p>粘贴 PAT。仓库主人用 fine-grained token（Contents 读写）；仓库协作者用 classic token（勾选 repo）。token 保存在浏览器 cookie，30 天内免登录；点「退出」会清除。</p>
       <form id="login-form">

@@ -12,6 +12,8 @@
   <header class="topbar">
     <div class="brand">
       <a class="topbar-link" href="/">← 审核台</a>
+      <a class="topbar-link" href="/published.html">已展示数据</a>
+      <a class="topbar-link" href="/requests.html">申请 / 联系</a>
       <strong>审计日志</strong>
       <span id="user-label"></span>
     </div>
@@ -19,7 +21,17 @@
   </header>
 
   <main>
-    <section id="login-view" class="panel login">
+    <section id="boot-view" class="panel login boot" aria-live="polite">
+      <h1><span class="boot-spinner" aria-hidden="true"></span>正在进入审计日志…</h1>
+      <p>正在确认登录状态，通常无需重新输入 token。</p>
+      <p id="boot-status" class="status" role="status">正在验证登录状态…</p>
+      <div id="boot-actions" class="actions" hidden>
+        <button id="boot-retry" type="button">重试</button>
+        <button id="boot-login" type="button" class="ghost">重新登录</button>
+      </div>
+    </section>
+
+    <section id="login-view" class="panel login" hidden>
       <h1>管理员登录</h1>
       <p>使用与审核台相同的 GitHub PAT。登录后 30 天内免登录。</p>
       <form id="login-form">

@@ -91,5 +91,8 @@ export function createClient(token, fetchImpl = fetch) {
       `/repos/${owner}/${repo}/contents/${encodePath(path)}`,
       { method: 'DELETE', body: { message, sha, branch } },
     ),
+    dispatchEvent: (owner, repo, eventType) => request(`/repos/${owner}/${repo}/dispatches`, {
+      method: 'POST', body: { event_type: eventType },
+    }),
   };
 }

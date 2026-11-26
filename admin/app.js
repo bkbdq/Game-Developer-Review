@@ -1186,25 +1186,38 @@ loginForm.addEventListener('submit', event => {
   signIn(tokenInput.value.trim());
 });
 
-async function deploySite() {
-  if (state.busy) return;
-  deployButton.disabled = true;
-  setStatus(globalStatus, '正在更新展示站…');
+async function triggerRemoteDeploy() {
   try {
-    const response = await fetch('/api/local/deploy', { method: 'POST' });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.ok) throw new Error(data.message || `HTTP ${response.status}`);
-    await logDeployEvent('success', '展示站已更新');
-    setStatus(globalStatus, '展示站已更新');
+    await state.client.dispatchEvent(config.owner, config.publicRepo, 'deploy-site');
+    await logDeployEvent('success', '已触发 GitHub Actions 部署');
+    setStatus(globalStatus, '已触发 GitHub Actions 部署，通常 1–2 分钟生效；可在 Actions 页面查看进度');
   } catch (error) {
     await logDeployEvent('failed', error.message);
-    setStatus(globalStatus, `展示站未更新：${error.message}`, true);
-  } finally {
-    deployButton.disabled = false;
+    setStatus(globalStatus, `更新展示站失败：${error.message}`, true);
   }
 }
 
-deployButton.hidden = !localMode;
+async function deploySite() {
+  if (state.busy) return;
+  deployButton.disabled = true;
+  if (localMode) {
+    setStatus(globalStatus, '正在更新展示站…');
+    try {
+      const response = await fetch('/api/local/deploy', { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.message || `HTTP ${response.status}`);
+      await logDeployEvent('success', '本地部署成功');
+      setStatus(globalStatus, '展示站已更新');
+      deployButton.disabled = false;
+      return;
+    } catch (error) {
+      setStatus(globalStatus, `本地部署失败：${error.message}，正在改用 GitHub Actions…`, true);
+    }
+  }
+  await triggerRemoteDeploy();
+  deployButton.disabled = false;
+}
+
 deployButton.addEventListener('click', deploySite);
 
 logoutButton.addEventListener('click', () => signOut());

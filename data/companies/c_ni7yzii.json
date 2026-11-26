@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_ni7yzii",
+  "slug": "ni7yzii",
+  "name": "腾讯",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_ndgnkrp",
+      "name": "洛克王国世界",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-26",
+  "updatedAt": "2026-11-26"
+}

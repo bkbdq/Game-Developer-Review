@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_n6mp0z3",
+  "slug": "n6mp0z3",
+  "name": "字节跳动",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_nwuijj7",
+      "name": "晶核",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-26",
+  "updatedAt": "2026-11-26"
+}

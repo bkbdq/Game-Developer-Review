@@ -14,8 +14,28 @@
       "id": "p_nvx1xvt",
       "name": "穿越火线 电竞",
       "status": "live"
+    },
+    {
+      "id": "p_n9a1k17",
+      "name": "雪中悍刀行",
+      "status": "dev"
+    },
+    {
+      "id": "p_rs-jc3jbg",
+      "name": "代号RS",
+      "status": "dev"
+    },
+    {
+      "id": "p_2-n6zv1j",
+      "name": "王牌战士2",
+      "status": "live"
+    },
+    {
+      "id": "p_nqs12f3",
+      "name": "穿越火线：虹",
+      "status": "dev"
     }
   ],
   "createdAt": "2026-11-26",
-  "updatedAt": "2026-11-26"
+  "updatedAt": "2026-11-27"
 }

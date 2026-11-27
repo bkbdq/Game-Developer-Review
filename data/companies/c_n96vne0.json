@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_n96vne0",
+  "slug": "n96vne0",
+  "name": "微派网络",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_n3f6s10",
+      "name": "贪吃蛇大作战",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

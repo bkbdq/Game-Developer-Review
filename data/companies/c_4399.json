@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_4399",
+  "slug": "4399",
+  "name": "4399",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_n0jyf3j",
+      "name": "生活模拟",
+      "status": "dev"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

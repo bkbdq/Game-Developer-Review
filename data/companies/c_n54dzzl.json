@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_n54dzzl",
+  "slug": "n54dzzl",
+  "name": "广州小丑鱼科技",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_n4vom3x",
+      "name": "斗破：莫欺少年穷",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

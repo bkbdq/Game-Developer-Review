@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_n26sjlx",
+  "slug": "n26sjlx",
+  "name": "多益",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_dw2",
+      "name": "DW2",
+      "status": "unknown"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

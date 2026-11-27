@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_nwmxigi",
+  "slug": "nwmxigi",
+  "name": "真有趣",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_nkihz71",
+      "name": "香肠派对",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

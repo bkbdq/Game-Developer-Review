@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_n2zq1gb",
+  "slug": "n2zq1gb",
+  "name": "昆仑万维",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_nyehb2h",
+      "name": "猫森学园",
+      "status": "dev"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

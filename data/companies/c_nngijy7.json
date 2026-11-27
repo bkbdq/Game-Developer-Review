@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_nngijy7",
+  "slug": "nngijy7",
+  "name": "杭州雅乐",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_noy51p4",
+      "name": "中台",
+      "status": "unknown"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

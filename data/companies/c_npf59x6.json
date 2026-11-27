@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_npf59x6",
+  "slug": "npf59x6",
+  "name": "朝夕光年",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_totopia",
+      "name": "Totopia",
+      "status": "dev"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

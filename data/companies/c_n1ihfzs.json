@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_n1ihfzs",
+  "slug": "n1ihfzs",
+  "name": "西山居",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_nvseiou",
+      "name": "剑侠世界",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

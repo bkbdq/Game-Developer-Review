@@ -30,7 +30,7 @@ export const projects = studios.flatMap(({company:c, data, rating}) => {
       id: project.id, name: project.name, statusKey: project.status, status: statuses[project.status] || statuses.unknown,
       company: c.name, companyRating:rating, slug:c.slug, aliases, reviews, featuredReview, cover, thumb, scene,
       path:href(`project/${encodeURIComponent(c.slug)}/${encodeURIComponent(project.id)}/`),
-      search:[c.name,c.slug,...aliases,project.name,art?.[0]].join(' ').normalize('NFKC').toLocaleLowerCase(),
+      search:[c.name,c.slug,...aliases,project.name,...(project.aliases ?? []),art?.[0]].join(' ').normalize('NFKC').toLocaleLowerCase(),
       ...projectStats(reviews,asOf)
     };
   });

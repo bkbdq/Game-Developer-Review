@@ -105,3 +105,11 @@ export function newProjectId(name, existingIds = new Set()) {
   while (existingIds.has(`${base}-${index}`)) index += 1;
   return `${base}-${index}`;
 }
+
+/** 生成项目的新内容；保留 genre / featuredReviewId / hidden 等其余字段。 */
+export function composeProject(original, { name, aliases = [], status }) {
+  const next = { ...clone(original), name, status };
+  if (aliases.length) next.aliases = [...aliases];
+  else delete next.aliases;
+  return next;
+}

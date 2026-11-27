@@ -12,7 +12,7 @@
   <header class="topbar">
     <div class="brand"><strong>审核控制台</strong><span id="user-label"></span></div>
     <div class="topbar-actions">
-      <a class="topbar-link" href="/published.html">已展示数据</a>
+      <a class="topbar-link" href="/data.html">数据维护</a>
       <a class="topbar-link" href="/requests.html">申请 / 联系</a>
       <a class="topbar-link" href="/audit.html">审计日志</a>
       <button id="logout-button" type="button" class="ghost" hidden>退出</button>
@@ -58,6 +58,11 @@
           <strong id="count-contacts">0</strong>
           <small>去查看</small>
         </a>
+        <button id="overview-changes" type="button" class="overview-card">
+          <span class="overview-label">待提交改动</span>
+          <strong id="count-changes">0</strong>
+          <small>去审核</small>
+        </button>
       </section>
 
       <div class="toolbar">
@@ -72,10 +77,15 @@
           <div class="tabs">
             <button id="tab-pending" type="button" class="tab active">待审</button>
             <button id="tab-staged" type="button" class="tab">暂存</button>
+            <button id="tab-changes" type="button" class="tab">数据改动</button>
           </div>
           <div id="staged-bar" class="staged-bar" hidden>
             <span id="staged-summary"></span>
             <button id="publish-batch-button" type="button">全部发布</button>
+          </div>
+          <div id="change-bar" class="staged-bar" hidden>
+            <span id="change-summary"></span>
+            <button id="submit-changes-button" type="button">批量提交</button>
           </div>
           <div id="pending-list"></div>
           <button id="load-more" type="button" class="ghost" hidden>加载更多</button>
@@ -83,6 +93,7 @@
 
         <section class="panel detail">
           <div id="detail-empty" class="empty">选择左侧一条待审提交</div>
+          <div id="change-detail" class="change-detail" hidden></div>
 
           <form id="review-form" hidden>
             <div id="submission-summary" class="summary"></div>

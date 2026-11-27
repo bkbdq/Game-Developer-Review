@@ -15,6 +15,13 @@ import {
   composeProject,
   newProjectId,
 } from './lib/published.js';
+import {
+  loadChanges,
+  stageChange,
+  applyChangesToData,
+  collectPendingIds,
+  STORAGE_KEY,
+} from './lib/changes.js';
 
 const PROJECT_STATUSES = [
   ['live', '已上线'],
@@ -39,6 +46,7 @@ const loginStatus = $('#login-status');
 const appView = $('#app-view');
 const logoutButton = $('#logout-button');
 const userLabel = $('#user-label');
+const pendingChangesLink = $('#pending-changes-link');
 const tabs = [...document.querySelectorAll('.data-tabs .tab')];
 const viewReviews = $('#view-reviews');
 const viewCompanies = $('#view-companies');
@@ -123,6 +131,9 @@ const state = {
   editingReviewId: null,
   editingCompanyId: null,
   editingProject: null,
+  pendingReviewIds: new Set(),
+  pendingCompanyIds: new Set(),
+  pendingProjectKeys: new Set(),
   view: 'reviews',
   busy: false,
 };
@@ -180,14 +191,6 @@ function handleError(error) {
     return;
   }
   setStatus(globalStatus, describeError(error), true);
-}
-
-async function logAudit(action, payload) {
-  try {
-    await state.api.logEvent({ action, ...payload });
-  } catch {
-    // 审计写入失败不影响保存结果
-  }
 }
 
 async function mapLimit(items, limit, mapper) {
@@ -294,41 +297,63 @@ function setBusy(busy) {
   projectRefresh.disabled = busy;
 }
 
-async function writeReviewFile(entry, next, message, note) {
-  const file = await state.client.putFile(config.owner, config.publicRepo, entry.path, {
-    message,
-    content: JSON.stringify(next, null, 2) + '\n',
-    sha: entry.sha,
-    branch: config.publicBranch,
-  });
-  entry.data = next;
-  entry.sha = file?.content?.sha || entry.sha;
-  await logAudit('published_edit', {
-    targetType: 'review',
-    targetId: next.id,
-    reviewId: next.id,
-    companyId: next.companyId,
-    note,
-    commitSha: file?.commit?.sha || '',
-  });
+function pendingBadge(isPending) {
+  return isPending ? h('span', { class: 'badge pending-badge' }, '待审核') : null;
 }
 
-async function writeCompanyFile(entry, next, message, note) {
-  const file = await state.client.putFile(config.owner, config.publicRepo, entry.path, {
-    message,
-    content: JSON.stringify(next, null, 2) + '\n',
-    sha: entry.sha,
-    branch: config.publicBranch,
+function updatePendingLink(count = loadChanges().length) {
+  pendingChangesLink.textContent = `待审改动（${count}）`;
+  pendingChangesLink.classList.toggle('has-items', count > 0);
+}
+
+function syncPendingFromChanges(list = loadChanges()) {
+  const pending = collectPendingIds(list);
+  state.pendingReviewIds = pending.reviewIds;
+  state.pendingCompanyIds = pending.companyIds;
+  state.pendingProjectKeys = pending.projectKeys;
+  updatePendingLink(list.length);
+}
+
+function pendingLabels(company) {
+  return {
+    company: company?.data?.name || '',
+    projects: Object.fromEntries(((company?.data?.projects) || []).map(project => [project.id, project.name])),
+  };
+}
+
+function stageReviewChange(entry, before, after) {
+  const company = state.companies.get(before.companyId);
+  const list = stageChange({
+    path: entry.path,
+    kind: 'review',
+    reviewId: before.id,
+    companyId: before.companyId,
+    title: company ? `${company.data.name} · 评价` : `评价 ${before.id}`,
+    labels: pendingLabels(company),
+    before,
+    after,
   });
-  entry.data = next;
-  entry.sha = file?.content?.sha || entry.sha;
-  await logAudit('published_edit', {
-    targetType: 'company',
-    targetId: next.id,
-    companyId: next.id,
-    note,
-    commitSha: file?.commit?.sha || '',
+  syncPendingFromChanges(list);
+  return list;
+}
+
+function stageCompanyChange(entry, before, after) {
+  const label = after || before || {};
+  const list = stageChange({
+    path: entry.path,
+    kind: 'company',
+    companyId: label.id || entry.data.id,
+    title: label.name || entry.data.name || '公司',
+    labels: pendingLabels({ data: label }),
+    before,
+    after,
   });
+  syncPendingFromChanges(list);
+  return list;
+}
+
+function stagedNotice(count) {
+  setStatus(globalStatus, `已保存到待审核（共 ${count} 项），请到审核台批量提交`);
 }
 
 // ── 视图切换 ──────────────────────────────────────────────────────────────
@@ -429,7 +454,8 @@ function buildReviewRow(entry) {
     h('td', { class: 'cell-company' },
       h('strong', {}, company?.data.name || '（公司缺失）'),
       h('div', { class: 'cell-id' }, data.companyId || '—')),
-    h('td', { class: 'cell-project' }, reviewProjectName(entry), ' ', hiddenBadge(data)),
+    h('td', { class: 'cell-project' },
+      reviewProjectName(entry), ' ', hiddenBadge(data), ' ', pendingBadge(state.pendingReviewIds.has(data.id))),
     reviewCell,
     h('td', { class: 'cell-narrow' }, `${Number(data.score) || '—'} 星`),
     h('td', { class: 'cell-narrow' }, data.publishedAt || '—'),
@@ -622,70 +648,35 @@ async function saveReviewDialog(event) {
     return;
   }
 
-  setBusy(true);
-  setStatus(reviewDialogStatus, '正在保存…');
-  try {
-    await writeReviewFile(entry, next, `data: edit ${next.id}`, '数据表维护评价');
-    renderReviews();
-    setStatus(globalStatus, `已保存 ${next.id}；展示站会自动重建（约 1–2 分钟）`);
-    state.editingReviewId = null;
-    reviewDialog.close();
-  } catch (error) {
-    if (error.status === 401) {
-      signOut('登录已失效，请重新登录。');
-      return;
-    }
-    setStatus(reviewDialogStatus, describeError(error), true);
-  } finally {
-    setBusy(false);
-  }
+  const list = stageReviewChange(entry, entry.data, next);
+  entry.data = next;
+  renderReviews();
+  stagedNotice(list.length);
+  state.editingReviewId = null;
+  reviewDialog.close();
 }
 
 async function deleteReview(id) {
   if (state.busy) return;
   const entry = state.reviews.get(id);
   if (!entry) return;
-  if (!window.confirm(`确认删除评价 ${id}？展示站会在下一次构建后移除。`)) return;
-  setBusy(true);
-  try {
-    await state.client.deleteFile(config.owner, config.publicRepo, entry.path, {
-      message: `data: delete ${id}`,
-      sha: entry.sha,
-      branch: config.publicBranch,
-    });
-    state.reviews.delete(id);
-    await logAudit('published_delete', {
-      targetType: 'review',
-      targetId: id,
-      reviewId: id,
-      companyId: entry.data.companyId,
-      note: '删除评价',
-    });
-    setStatus(globalStatus, `已删除 ${id}；展示站会自动重建（约 1–2 分钟）`);
-    renderAll();
-  } catch (error) {
-    handleError(error);
-  } finally {
-    setBusy(false);
-  }
+  if (!window.confirm(`确认删除评价 ${id}？改动会先进入待审核列表。`)) return;
+  const list = stageReviewChange(entry, entry.data, null);
+  state.reviews.delete(id);
+  stagedNotice(list.length);
+  renderAll();
 }
 
 async function toggleReviewHidden(id) {
   if (state.busy) return;
   const entry = state.reviews.get(id);
   if (!entry) return;
-  const next = withHidden(entry.data);
-  setBusy(true);
-  try {
-    await writeReviewFile(entry, next, `data: ${next.hidden ? 'hide' : 'show'} ${id}`,
-      next.hidden ? '隐藏评价' : '取消隐藏评价');
-    setStatus(globalStatus, `${next.hidden ? '已隐藏' : '已恢复展示'} ${id}；展示站会自动重建（约 1–2 分钟）`);
-    renderAll();
-  } catch (error) {
-    handleError(error);
-  } finally {
-    setBusy(false);
-  }
+  const before = entry.data;
+  const next = withHidden(before);
+  const list = stageReviewChange(entry, before, next);
+  entry.data = next;
+  stagedNotice(list.length);
+  renderAll();
 }
 
 // ── 公司表 ────────────────────────────────────────────────────────────────
@@ -696,7 +687,8 @@ function buildCompanyRow(entry) {
   const aliases = (data.aliases || []).join('、') || '—';
 
   row.append(
-    h('td', { class: 'cell-company' }, h('strong', {}, data.name || '—'), ' ', hiddenBadge(data)),
+    h('td', { class: 'cell-company' },
+      h('strong', {}, data.name || '—'), ' ', hiddenBadge(data), ' ', pendingBadge(state.pendingCompanyIds.has(data.id))),
     h('td', { class: 'cell-aliases' }, aliases),
     h('td', { class: 'cell-narrow' }, String((data.projects || []).length)),
     h('td', { class: 'cell-narrow' }, countButton(reviewCountForCompany(data.id), () => openCompanyReviews(data.id))),
@@ -810,23 +802,12 @@ async function saveCompanyDialog(event) {
     return;
   }
 
-  setBusy(true);
-  setStatus(companyDialogStatus, '正在保存…');
-  try {
-    await writeCompanyFile(entry, next, `data: edit company ${next.id}`, '数据表维护公司信息');
-    renderAll();
-    setStatus(globalStatus, `已保存 ${next.id}；展示站会自动重建（约 1–2 分钟）`);
-    state.editingCompanyId = null;
-    companyDialog.close();
-  } catch (error) {
-    if (error.status === 401) {
-      signOut('登录已失效，请重新登录。');
-      return;
-    }
-    setStatus(companyDialogStatus, describeError(error), true);
-  } finally {
-    setBusy(false);
-  }
+  const list = stageCompanyChange(entry, entry.data, next);
+  entry.data = next;
+  renderAll();
+  stagedNotice(list.length);
+  state.editingCompanyId = null;
+  companyDialog.close();
 }
 
 async function deleteCompany() {
@@ -840,53 +821,26 @@ async function deleteCompany() {
     setStatus(companyDialogDeleteHint, '公司下仍有项目或评价，不能删除。', true);
     return;
   }
-  if (!window.confirm(`确认删除公司「${data.name}」？此操作不可撤销。`)) return;
+  if (!window.confirm(`确认删除公司「${data.name}」？改动会先进入待审核列表。`)) return;
 
-  setBusy(true);
-  try {
-    await state.client.deleteFile(config.owner, config.publicRepo, entry.path, {
-      message: `data: delete company ${data.id}`,
-      sha: entry.sha,
-      branch: config.publicBranch,
-    });
-    state.companies.delete(data.id);
-    await logAudit('published_delete', {
-      targetType: 'company',
-      targetId: data.id,
-      companyId: data.id,
-      note: '删除公司',
-    });
-    state.editingCompanyId = null;
-    companyDialog.close();
-    setStatus(globalStatus, `已删除公司 ${data.id}；展示站会自动重建（约 1–2 分钟）`);
-    renderAll();
-  } catch (error) {
-    if (error.status === 401) {
-      signOut('登录已失效，请重新登录。');
-      return;
-    }
-    setStatus(companyDialogStatus, describeError(error), true);
-  } finally {
-    setBusy(false);
-  }
+  const list = stageCompanyChange(entry, entry.data, null);
+  state.companies.delete(data.id);
+  state.editingCompanyId = null;
+  companyDialog.close();
+  stagedNotice(list.length);
+  renderAll();
 }
 
 async function toggleCompanyHidden(id) {
   if (state.busy) return;
   const entry = state.companies.get(id);
   if (!entry) return;
-  const next = withHidden(entry.data);
-  setBusy(true);
-  try {
-    await writeCompanyFile(entry, next, `data: ${next.hidden ? 'hide' : 'show'} company ${id}`,
-      next.hidden ? '隐藏公司' : '取消隐藏公司');
-    setStatus(globalStatus, `${next.hidden ? '已隐藏' : '已恢复展示'}公司 ${entry.data.name}；展示站会自动重建（约 1–2 分钟）`);
-    renderAll();
-  } catch (error) {
-    handleError(error);
-  } finally {
-    setBusy(false);
-  }
+  const before = entry.data;
+  const next = withHidden(before);
+  const list = stageCompanyChange(entry, before, next);
+  entry.data = next;
+  stagedNotice(list.length);
+  renderAll();
 }
 
 // ── 项目表 ────────────────────────────────────────────────────────────────
@@ -912,7 +866,9 @@ function buildProjectRow(companyEntry, project) {
   const count = reviewCountForProject(data.id, project.id);
 
   row.append(
-    h('td', { class: 'cell-title' }, h('strong', {}, project.name), ' ', hiddenBadge(project)),
+    h('td', { class: 'cell-title' },
+      h('strong', {}, project.name), ' ', hiddenBadge(project), ' ',
+      pendingBadge(state.pendingProjectKeys.has(`${data.id}:${project.id}`))),
     h('td', { class: 'cell-aliases' }, aliases),
     h('td', { class: 'cell-company' }, data.name),
     h('td', { class: 'cell-narrow' }, projectStatusLabel(project.status)),
@@ -1045,23 +1001,12 @@ async function saveProjectDialog(event) {
     return;
   }
 
-  setBusy(true);
-  setStatus(projectDialogMessage, '正在保存…');
-  try {
-    await writeCompanyFile(entry, next, `data: edit project ${project.id}`, '数据表维护项目信息');
-    renderAll();
-    setStatus(globalStatus, `已保存项目「${nextProject.name}」；展示站会自动重建（约 1–2 分钟）`);
-    state.editingProject = null;
-    projectDialog.close();
-  } catch (error) {
-    if (error.status === 401) {
-      signOut('登录已失效，请重新登录。');
-      return;
-    }
-    setStatus(projectDialogMessage, describeError(error), true);
-  } finally {
-    setBusy(false);
-  }
+  const list = stageCompanyChange(entry, entry.data, next);
+  entry.data = next;
+  renderAll();
+  stagedNotice(list.length);
+  state.editingProject = null;
+  projectDialog.close();
 }
 
 async function deleteProject(companyId, projectId) {
@@ -1075,19 +1020,14 @@ async function deleteProject(companyId, projectId) {
     setStatus(globalStatus, '该项目下已有展示评价，不能删除', true);
     return;
   }
-  if (!window.confirm(`确认删除项目「${project.name}」？此操作不可撤销。`)) return;
+  if (!window.confirm(`确认删除项目「${project.name}」？改动会先进入待审核列表。`)) return;
 
+  const before = entry.data;
   const next = applyProjectChange(entry, projectId, () => null);
-  setBusy(true);
-  try {
-    await writeCompanyFile(entry, next, `data: delete project ${projectId}`, '删除项目');
-    setStatus(globalStatus, `已删除项目「${project.name}」；展示站会自动重建（约 1–2 分钟）`);
-    renderAll();
-  } catch (error) {
-    handleError(error);
-  } finally {
-    setBusy(false);
-  }
+  const list = stageCompanyChange(entry, before, next);
+  entry.data = next;
+  stagedNotice(list.length);
+  renderAll();
 }
 
 async function toggleProjectHidden(companyId, projectId) {
@@ -1096,19 +1036,13 @@ async function toggleProjectHidden(companyId, projectId) {
   if (!entry) return;
   const project = (entry.data.projects || []).find(item => item.id === projectId);
   if (!project) return;
+  const before = entry.data;
   const nextProject = withHidden(project);
   const next = applyProjectChange(entry, projectId, () => nextProject);
-  setBusy(true);
-  try {
-    await writeCompanyFile(entry, next, `data: ${nextProject.hidden ? 'hide' : 'show'} project ${projectId}`,
-      nextProject.hidden ? '隐藏项目' : '取消隐藏项目');
-    setStatus(globalStatus, `${nextProject.hidden ? '已隐藏' : '已恢复展示'}项目「${project.name}」；展示站会自动重建（约 1–2 分钟）`);
-    renderAll();
-  } catch (error) {
-    handleError(error);
-  } finally {
-    setBusy(false);
-  }
+  const list = stageCompanyChange(entry, before, next);
+  entry.data = next;
+  stagedNotice(list.length);
+  renderAll();
 }
 
 // ── 新增项目 ──────────────────────────────────────────────────────────────
@@ -1153,17 +1087,11 @@ async function addProject() {
     return;
   }
 
-  setBusy(true);
-  try {
-    await writeCompanyFile(entry, next, `data: add project ${id}`, '新增项目');
-    projectNewForm.hidden = true;
-    setStatus(globalStatus, `已添加项目「${name}」；展示站会自动重建（约 1–2 分钟）`);
-    renderAll();
-  } catch (error) {
-    handleError(error);
-  } finally {
-    setBusy(false);
-  }
+  const list = stageCompanyChange(entry, entry.data, next);
+  entry.data = next;
+  projectNewForm.hidden = true;
+  stagedNotice(list.length);
+  renderAll();
 }
 
 // ── 数据加载 ──────────────────────────────────────────────────────────────
@@ -1211,6 +1139,13 @@ async function loadData() {
     }
   });
   state.reviews = new Map(reviewFiles.filter(Boolean).map(entry => [entry.data.id, entry]));
+
+  const changes = loadChanges();
+  const pending = applyChangesToData(changes, state);
+  state.pendingReviewIds = pending.reviewIds;
+  state.pendingCompanyIds = pending.companyIds;
+  state.pendingProjectKeys = pending.projectKeys;
+  updatePendingLink(changes.length);
 
   state.editingReviewId = null;
   state.editingCompanyId = null;
@@ -1282,8 +1217,12 @@ function signOut(message = '') {
   state.editingReviewId = null;
   state.editingCompanyId = null;
   state.editingProject = null;
+  state.pendingReviewIds = new Set();
+  state.pendingCompanyIds = new Set();
+  state.pendingProjectKeys = new Set();
   state.busy = false;
   userLabel.textContent = '';
+  updatePendingLink();
   reviewRows.replaceChildren();
   companyRows.replaceChildren();
   projectRows.replaceChildren();
@@ -1399,11 +1338,20 @@ projectDialog.addEventListener('cancel', event => {
   closeProjectDialog();
 });
 
+window.addEventListener('storage', event => {
+  if (event.key !== STORAGE_KEY) return;
+  syncPendingFromChanges(loadChanges());
+  renderAll();
+  setStatus(globalStatus, '待审核改动已在其他页面更新；点「刷新」同步最新数据');
+});
+
 window.addEventListener('beforeunload', event => {
   if (!hasDirty()) return;
   event.preventDefault();
   event.returnValue = '';
 });
+
+updatePendingLink();
 
 const savedToken = getToken();
 if (savedToken) signIn(savedToken, { silent: true });

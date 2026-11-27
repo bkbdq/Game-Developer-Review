@@ -117,7 +117,7 @@ button.danger { background: var(--danger); }
 
 .overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: .75rem;
   margin-bottom: 1rem;
 }
@@ -322,6 +322,10 @@ legend { padding: 0 .35rem; color: var(--muted); font-size: .85rem; }
 .status { min-height: 1.4rem; color: var(--muted); font-size: .88rem; }
 .status.error { color: var(--danger); }
 
+@media (max-width: 1040px) {
+  .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 780px) {
   .overview { grid-template-columns: 1fr; }
   .layout { grid-template-columns: 1fr; }
@@ -429,7 +433,38 @@ button.small { padding: .3rem .65rem; font-size: .82rem; }
   text-underline-offset: 2px;
   cursor: pointer;
 }
-.hidden-badge { color: var(--warn); border-color: currentColor; }
+.hidden-badge,
+.pending-badge { color: var(--warn); border-color: currentColor; }
+.topbar-link.has-items { color: var(--accent); border-color: var(--accent); }
+.change-action { color: var(--warn); font-size: .8rem; font-weight: 600; white-space: nowrap; }
+.change-head h2 { margin: 0 0 .2rem; font-size: 1.2rem; }
+.change-head .count { margin: 0 0 1rem; word-break: break-all; }
+.change-detail h3 { margin: 1.2rem 0 .5rem; font-size: 1rem; }
+.diff-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.diff-table th,
+.diff-table td { padding: .45rem .55rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.diff-table th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.diff-label { color: var(--muted); white-space: nowrap; }
+.diff-from {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: rgba(163, 59, 43, .5);
+  overflow-wrap: anywhere;
+}
+.diff-to { color: var(--danger); font-weight: 600; overflow-wrap: anywhere; }
+.change-project {
+  margin-top: .9rem;
+  padding: .7rem .8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.change-project-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .5rem;
+  margin-bottom: .4rem;
+}
 .new-project-form { margin-bottom: .9rem; }
 .is-busy .data-panel { opacity: .6; cursor: progress; }
 

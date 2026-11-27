@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_np25qeu",
+  "slug": "np25qeu",
+  "name": "育碧",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_nmxlnzn",
+      "name": "舞力全开派对",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

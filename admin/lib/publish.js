@@ -89,6 +89,59 @@ export async function publishReviews({ client, config, items }) {
 }
 
 /**
+ * 批量提交数据维护改动：一个 commit 写入/删除多个文件，只触发一次站点重建。
+ * changes 中每项包含 path / after（after 为 null 表示删除）。
+ */
+export async function publishFileChanges({ client, config, changes }) {
+  const { owner, publicRepo, publicBranch } = config;
+  const unique = new Map();
+  changes.forEach(change => unique.set(change.path, change));
+  if (!unique.size) return { files: 0, commitSha: '' };
+
+  const treeInfo = await client.getTree(owner, publicRepo, publicBranch);
+  const existingPaths = new Set(
+    (treeInfo.tree || []).filter(entry => entry.type === 'blob').map(entry => entry.path),
+  );
+
+  const entries = [];
+  for (const change of unique.values()) {
+    if (change.after === null) {
+      if (existingPaths.has(change.path)) {
+        entries.push({ path: change.path, mode: '100644', type: 'blob', sha: null });
+      }
+      continue;
+    }
+    const content = JSON.stringify(change.after, null, 2) + '\n';
+    const blob = await client.createBlob(owner, publicRepo, content);
+    entries.push({ path: change.path, mode: '100644', type: 'blob', sha: blob.sha });
+  }
+  if (!entries.length) return { files: 0, commitSha: '' };
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const ref = await client.getRef(owner, publicRepo, publicBranch);
+      const base = await client.getCommit(owner, publicRepo, ref.object.sha);
+      const tree = await client.createTree(owner, publicRepo, {
+        base_tree: base.tree.sha,
+        tree: entries,
+      });
+      const commit = await client.createCommit(owner, publicRepo, {
+        message: `data: batch update ${entries.length} file${entries.length > 1 ? 's' : ''}`,
+        tree: tree.sha,
+        parents: [ref.object.sha],
+      });
+      await client.patchRef(owner, publicRepo, publicBranch, commit.sha);
+      return { files: entries.length, commitSha: commit.sha };
+    } catch (error) {
+      if (error.status === 409 && attempt === 0) continue;
+      throw error;
+    }
+  }
+
+  throw new Error('提交冲突，请重试');
+}
+
+/**
  * 把审核结果原子写入公开仓。重复调用时以 reviewId 判断是否已写入，可安全重试。
  */
 export async function publishReview({ client, config, review, company }) {

@@ -18,7 +18,15 @@ import {
   composeCompany,
   companyContentChanged,
   newProjectId,
+  composeProject,
 } from '../admin/lib/published.js';
+import {
+  stageChange,
+  clearChanges,
+  describeChange,
+  collectPendingIds,
+  applyChangesToData,
+} from '../admin/lib/changes.js';
 import { getSession, setSession, clearSession } from '../admin/lib/session.js';
 
 let passed = 0;
@@ -188,6 +196,104 @@ check('公司内容变化可识别', companyContentChanged(companyOriginal, comp
 const generatedId = newProjectId('测试项目', new Set());
 check('新项目 ID 以 p_ 开头', generatedId.startsWith('p_'), true);
 check('项目 ID 冲突追加序号', newProjectId('测试项目', new Set([generatedId])), `${generatedId}-2`);
+
+// ── 数据表维护：项目编辑 ─────────────────────────────────────────────────
+const projectNext = composeProject(companyOriginal.projects[0], {
+  name: '项目改名',
+  aliases: ['别名一', '别名二'],
+  status: 'dev',
+});
+check('项目改名', projectNext.name, '项目改名');
+check('项目状态更新', projectNext.status, 'dev');
+check('项目别名写入', JSON.stringify(projectNext.aliases), JSON.stringify(['别名一', '别名二']));
+check('项目保留扩展字段', projectNext.genre, 'rpg');
+check('项目保留隐藏标记', composeProject(
+  { id: 'p_z', name: '项目', status: 'live', hidden: true },
+  { name: '项目', aliases: [], status: 'live' },
+).hidden, true);
+const projectNoAlias = composeProject(
+  { id: 'p_y', name: '项目', status: 'live', aliases: ['旧别名'] },
+  { name: '项目', aliases: [], status: 'live' },
+);
+check('清空别名后移除字段', 'aliases' in projectNoAlias, false);
+
+// ── 数据维护：本地待审核改动 ─────────────────────────────────────────────
+const changeStore = new Map();
+globalThis.localStorage = {
+  getItem: key => (changeStore.has(key) ? changeStore.get(key) : null),
+  setItem: (key, value) => { changeStore.set(key, String(value)); },
+  removeItem: key => { changeStore.delete(key); },
+};
+
+const changeReviewBefore = {
+  schemaVersion: 1, id: 'rv_chg1', companyId: 'c_x', projectId: 'p_x', score: 3,
+  comment: '旧正文', publishedAt: '2026-11-01', revision: 1,
+};
+const changeReviewAfter = { ...changeReviewBefore, score: 4, revision: 2 };
+const reviewChange = {
+  path: 'data/reviews/c_x/rv_chg1.json',
+  kind: 'review',
+  reviewId: 'rv_chg1',
+  companyId: 'c_x',
+  title: '测试公司 · 评价',
+  labels: { company: '测试公司', projects: { p_x: '项目' } },
+};
+let list = stageChange({ ...reviewChange, before: changeReviewBefore, after: changeReviewAfter });
+check('待审核改动写入一条', list.length, 1);
+check('待审核改动保留原值', list[0].before.score, 3);
+list = stageChange({ ...reviewChange, before: changeReviewAfter, after: { ...changeReviewAfter, score: 5 } });
+check('同一文件改动合并为一条', list.length, 1);
+check('合并保留最初 before', list[0].before.score, 3);
+check('合并使用最新 after', list[0].after.score, 5);
+const revertedList = stageChange({ ...reviewChange, before: { ...changeReviewAfter, score: 5 }, after: changeReviewBefore });
+check('改回原样自动移除记录', revertedList.length, 0);
+
+clearChanges();
+list = stageChange({ ...reviewChange, before: changeReviewBefore, after: { ...changeReviewBefore, hidden: true } });
+const hiddenInfo = describeChange(list[0]);
+check('隐藏改动的动作', hiddenInfo.action, '隐藏');
+check('隐藏改动标出新值', hiddenInfo.rows.some(row => row.label === '隐藏' && row.to === '是'), true);
+
+clearChanges();
+const changeCompanyBefore = {
+  schemaVersion: 1, id: 'c_x', slug: 'x', name: '测试公司', aliases: [],
+  projects: [{ id: 'p_x', name: '项目', status: 'live' }],
+  createdAt: '2026-01-01', updatedAt: '2026-01-01',
+};
+const changeCompanyAfter = {
+  ...changeCompanyBefore,
+  projects: [...changeCompanyBefore.projects, { id: 'p_y', name: '新项目', status: 'dev' }],
+};
+list = stageChange({
+  path: 'data/companies/c_x.json',
+  kind: 'company',
+  companyId: 'c_x',
+  title: '测试公司',
+  before: changeCompanyBefore,
+  after: changeCompanyAfter,
+});
+const companyInfo = describeChange(list[0]);
+check('公司改动识别新增项目', companyInfo.projects[0].kind, 'added');
+check('公司改动项目名', companyInfo.projects[0].name, '新项目');
+const pendingIds = collectPendingIds(list);
+check('待审核公司集合', pendingIds.companyIds.has('c_x'), true);
+check('待审核项目集合', pendingIds.projectKeys.has('c_x:p_y'), true);
+
+clearChanges();
+const deleteList = stageChange({ ...reviewChange, before: changeReviewBefore, after: null });
+const reviewMap = new Map([['rv_chg1', { path: reviewChange.path, sha: '', data: changeReviewBefore }]]);
+applyChangesToData(deleteList, { companies: new Map(), reviews: reviewMap });
+check('待审核删除后评价从列表移除', reviewMap.has('rv_chg1'), false);
+
+clearChanges();
+const updateList = stageChange({
+  path: 'data/companies/c_x.json', kind: 'company', companyId: 'c_x', title: '测试公司',
+  before: changeCompanyBefore, after: changeCompanyAfter,
+});
+const companyMap = new Map([['c_x', { path: 'data/companies/c_x.json', sha: '', data: changeCompanyBefore }]]);
+applyChangesToData(updateList, { companies: companyMap, reviews: new Map() });
+check('待审核改动叠加到公司数据', companyMap.get('c_x').data.projects.length, 2);
+clearChanges();
 
 // ── 登录会话缓存 ─────────────────────────────────────────────────────────
 const sessionStore = new Map();

@@ -88,9 +88,13 @@ function byProfile(reviews) {
 }
 
 function buildDetail(company) {
-  const reviews = loadReviews(company.id);
+  const allProjects = Array.isArray(company.projects) ? company.projects : [];
+  const projects = allProjects.filter(project => !project.hidden);
+  const hiddenProjectIds = new Set(allProjects.filter(project => project.hidden).map(project => project.id));
+  const reviews = loadReviews(company.id)
+    .filter(review => !review.hidden && !(review.projectId && hiddenProjectIds.has(review.projectId)));
   const scores = reviews.map(review => review.score);
-  const perProject = new Map(company.projects.map(project => [project.id, []]));
+  const perProject = new Map(projects.map(project => [project.id, []]));
   reviews.forEach(review => {
     if (review.projectId && perProject.has(review.projectId)) perProject.get(review.projectId).push(review.score);
   });
@@ -104,12 +108,13 @@ function buildDetail(company) {
       avgScore: avg(scores),
       scoreDistribution: distribution(reviews),
     },
-    projects: company.projects.map(project => {
+    projects: projects.map(project => {
       const projectScores = perProject.get(project.id);
       return {
         id: project.id,
         name: project.name,
         status: project.status,
+        ...(Array.isArray(project.aliases) && project.aliases.length ? { aliases: project.aliases } : {}),
         ...(project.featuredReviewId && { featuredReviewId: project.featuredReviewId }),
         reviewCount: projectScores.length,
         avgScore: avg(projectScores),
@@ -122,11 +127,14 @@ function buildDetail(company) {
 
 function main() {
   const taxonomy = readJson(join(dataDir, 'taxonomy.json'));
-  const companies = loadCompanies();
+  const companies = loadCompanies().filter(company => !company.hidden);
   const generatedAt = shanghaiNow();
   const details = companies.map(company => ({ company, detail: buildDetail(company) }));
   const reviewTotal = details.reduce((sum, item) => sum + item.detail.company.reviewCount, 0);
-  const projectTotal = companies.reduce((sum, company) => sum + company.projects.length, 0);
+  const projectTotal = companies.reduce(
+    (sum, company) => sum + (company.projects || []).filter(project => !project.hidden).length,
+    0,
+  );
 
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(join(outDir, 'companies'), { recursive: true });

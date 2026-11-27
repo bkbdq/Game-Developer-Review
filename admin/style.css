@@ -117,7 +117,7 @@ button.danger { background: var(--danger); }
 
 .overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: .75rem;
   margin-bottom: 1rem;
 }
@@ -322,6 +322,10 @@ legend { padding: 0 .35rem; color: var(--muted); font-size: .85rem; }
 .status { min-height: 1.4rem; color: var(--muted); font-size: .88rem; }
 .status.error { color: var(--danger); }
 
+@media (max-width: 1040px) {
+  .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 780px) {
   .overview { grid-template-columns: 1fr; }
   .layout { grid-template-columns: 1fr; }
@@ -387,81 +391,108 @@ legend { padding: 0 .35rem; color: var(--muted); font-size: .85rem; }
   font-size: .9rem;
 }
 
-/* 已展示数据管理 */
+/* 数据维护：评价 / 公司 / 项目表格 */
 button.small { padding: .3rem .65rem; font-size: .82rem; }
-.list.is-loading { pointer-events: none; opacity: .65; }
-#company-detail[aria-busy="true"] { cursor: progress; }
-#company-detail[aria-busy="true"] #company-form,
-#company-detail[aria-busy="true"] #review-list { opacity: .55; pointer-events: none; }
-.detail h2 { margin: 0; font-size: 1.3rem; }
-.published-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.1rem;
+.data-tabs { display: flex; gap: .35rem; margin-bottom: 1rem; }
+.data-tabs .tab { flex: 0 1 auto; padding: .5rem .9rem; border: 1px solid transparent; }
+.data-tabs .tab.active { border-color: var(--accent); }
+.data-toolbar { flex-wrap: wrap; }
+.data-toolbar input[type="search"],
+.data-toolbar select { width: auto; min-width: 12rem; flex: 1 1 12rem; max-width: 22rem; }
+.data-panel { padding: 0; overflow: hidden; }
+.data-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.data-table th,
+.data-table td { padding: .5rem .55rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.data-table th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table input,
+.data-table select,
+.data-table textarea { padding: .35rem .45rem; font-size: .88rem; }
+.data-table textarea { min-height: 2.6rem; resize: vertical; }
+.data-table .cell-narrow { white-space: nowrap; }
+.data-table .cell-id { color: var(--muted); font-size: .78rem; font-weight: 400; }
+.data-table .cell-company { min-width: 7rem; }
+.data-table .cell-title { min-width: 9rem; }
+.data-table .cell-aliases { min-width: 12rem; }
+.data-table .cell-project { min-width: 8rem; white-space: nowrap; }
+.data-table .cell-review { min-width: 24rem; }
+.data-table .cell-review strong { font-weight: 600; }
+.data-table .review-text { color: var(--muted); font-size: .86rem; margin-top: .2rem; }
+.data-table td.empty { padding: 2rem 0; text-align: center; color: var(--muted); }
+.data-table tr.is-hidden td { opacity: .5; }
+.data-table .row-actions { white-space: nowrap; }
+.data-table .row-actions button + button { margin-left: .35rem; }
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
-.published-head .count { margin: .2rem 0 0; }
-.published-section {
-  margin: 1.3rem 0;
-  padding-top: 1.1rem;
-  border-top: 1px solid var(--line);
+.hidden-badge,
+.pending-badge { color: var(--warn); border-color: currentColor; }
+.topbar-link.has-items { color: var(--accent); border-color: var(--accent); }
+.change-action { color: var(--warn); font-size: .8rem; font-weight: 600; white-space: nowrap; }
+.change-head h2 { margin: 0 0 .2rem; font-size: 1.2rem; }
+.change-head .count { margin: 0 0 1rem; word-break: break-all; }
+.change-detail h3 { margin: 1.2rem 0 .5rem; font-size: 1rem; }
+.diff-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.diff-table th,
+.diff-table td { padding: .45rem .55rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.diff-table th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.diff-label { color: var(--muted); white-space: nowrap; }
+.diff-from {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: rgba(163, 59, 43, .5);
+  overflow-wrap: anywhere;
 }
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: .75rem;
-  margin-bottom: .7rem;
-}
-.section-head h3 { margin: 0; font-size: 1.02rem; }
-.project-row {
-  display: grid;
-  grid-template-columns: 9rem minmax(0, 1.4fr) 8rem auto;
-  gap: .6rem;
-  align-items: end;
-  padding: .55rem .65rem;
-  margin-bottom: .5rem;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-}
-.project-row label { font-size: .8rem; color: var(--muted); font-weight: 600; }
-.project-row input,
-.project-row select { margin-top: .25rem; font-weight: 400; color: var(--ink); }
-.project-row button { justify-self: start; margin-bottom: .1rem; }
-.review-item {
-  padding: .7rem .85rem;
-  margin-bottom: .55rem;
+.diff-to { color: var(--danger); font-weight: 600; overflow-wrap: anywhere; }
+.change-project {
+  margin-top: .9rem;
+  padding: .7rem .8rem;
   border: 1px solid var(--line);
   border-radius: 10px;
 }
-.review-item.active { border-color: var(--accent); background: #eef7f1; }
-.review-item-head {
+.change-project-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: .75rem;
+  gap: .5rem;
+  margin-bottom: .4rem;
 }
-.review-item-text { margin: .35rem 0; font-size: .9rem; }
-.review-item-meta { color: var(--muted); font-size: .82rem; white-space: nowrap; }
-#review-form {
-  margin-top: 1.25rem;
-  padding-top: 1.1rem;
-  border-top: 1px solid var(--line);
+.new-project-form { margin-bottom: .9rem; }
+.is-busy .data-panel { opacity: .6; cursor: progress; }
+
+/* 评价编辑弹窗 */
+.modal {
+  width: min(52rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: 1.25rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
 }
-#review-form .grid label,
-#review-form > label { font-size: .88rem; color: var(--muted); }
-#review-form .grid input,
-#review-form .grid select,
-#review-form > label input,
-#review-form > label select { margin-top: .3rem; font-weight: 400; color: var(--ink); }
+.modal::backdrop { background: rgba(0, 0, 0, .45); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .35rem; }
+.modal-head h2 { margin: 0; font-size: 1.2rem; }
+.modal form > label { display: block; margin-bottom: .9rem; font-size: .88rem; color: var(--muted); }
+.modal form > label input,
+.modal form > label select,
+.modal form > label textarea,
+.modal .grid label input,
+.modal .grid label select { margin-top: .3rem; font-weight: 400; color: var(--ink); }
+.modal .grid { margin-bottom: .9rem; }
 
 @media (max-width: 780px) {
-  .project-row { grid-template-columns: 1fr 1fr; }
-  .review-item-head { flex-direction: column; gap: .2rem; }
-  .review-item-meta { white-space: normal; }
+  .data-toolbar input[type="search"],
+  .data-toolbar select { max-width: none; }
 }
 
-@media (prefers-color-scheme: dark) {
-  .review-item.active { background: #233a2e; }
-}
+

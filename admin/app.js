@@ -20,7 +20,8 @@ import {
   validateCompany,
   autoSlug,
 } from './lib/review.js';
-import { publishReview, publishReviews } from './lib/publish.js';
+import { publishReview, publishReviews, publishFileChanges } from './lib/publish.js';
+import { loadChanges, discardChange, clearChanges, describeChange, STORAGE_KEY } from './lib/changes.js';
 
 const STAGING_KEY = 'gdr.admin.staging';
 
@@ -59,10 +60,17 @@ const countRequests = $('#count-requests');
 const countContacts = $('#count-contacts');
 const tabPending = $('#tab-pending');
 const tabStaged = $('#tab-staged');
+const tabChanges = $('#tab-changes');
 const stagedBar = $('#staged-bar');
 const stagedSummary = $('#staged-summary');
 const publishBatchButton = $('#publish-batch-button');
+const changeBar = $('#change-bar');
+const changeSummary = $('#change-summary');
+const submitChangesButton = $('#submit-changes-button');
 const detailEmpty = $('#detail-empty');
+const changeDetail = $('#change-detail');
+const overviewChanges = $('#overview-changes');
+const countChanges = $('#count-changes');
 const reviewForm = $('#review-form');
 const summaryEl = $('#submission-summary');
 const companyCombo = createCombobox({
@@ -115,9 +123,11 @@ const state = {
   aliasIndex: new Map(),
   pending: [],
   pendingTotal: 0,
-  counts: { pending: 0, requests: 0, contacts: 0 },
+  counts: { pending: 0, requests: 0, contacts: 0, changes: 0 },
   staging: loadStaging(),
-  tab: 'pending',
+  changes: loadChanges(),
+  selectedChangeId: null,
+  tab: new URLSearchParams(location.search).get('tab') === 'changes' ? 'changes' : 'pending',
   selected: null,
   selectedId: null,
   reviewId: null,
@@ -159,12 +169,15 @@ function showApp() {
 }
 
 function renderOverview() {
+  state.counts.changes = state.changes.length;
   countPending.textContent = String(state.counts.pending);
   countRequests.textContent = String(state.counts.requests);
   countContacts.textContent = String(state.counts.contacts);
+  countChanges.textContent = String(state.changes.length);
   overviewPending.classList.toggle('has-items', state.counts.pending > 0);
   overviewRequests.classList.toggle('has-items', state.counts.requests > 0);
   overviewContacts.classList.toggle('has-items', state.counts.contacts > 0);
+  overviewChanges.classList.toggle('has-items', state.changes.length > 0);
 }
 
 async function refreshOverview() {
@@ -172,6 +185,7 @@ async function refreshOverview() {
   try {
     const summary = await state.api.summary();
     state.counts = {
+      ...state.counts,
       pending: summary.pending || 0,
       requests: summary.requests || 0,
       contacts: summary.contacts || 0,
@@ -260,23 +274,55 @@ function waitedDays(value) {
 function renderList() {
   const query = filterInput.value.trim().toLowerCase();
   const staged = state.tab === 'staged';
+  const changesTab = state.tab === 'changes';
   const stagedIds = new Set(state.staging.map(entry => entry.submissionId));
   const visiblePending = state.pending.filter(item => !stagedIds.has(item.id));
   const totalPending = Math.max(0, state.pendingTotal - (state.pending.length - visiblePending.length));
 
-  tabPending.classList.toggle('active', !staged);
+  tabPending.classList.toggle('active', state.tab === 'pending');
   tabStaged.classList.toggle('active', staged);
+  tabChanges.classList.toggle('active', changesTab);
   tabPending.textContent = `待审 ${totalPending}`;
   tabStaged.textContent = `暂存 ${state.staging.length}`;
+  tabChanges.textContent = `数据改动 ${state.changes.length}`;
   stagedBar.hidden = !staged || !state.staging.length;
   stagedSummary.textContent = `共 ${state.staging.length} 条，合并为一次提交`;
+  changeBar.hidden = !changesTab || !state.changes.length;
+  changeSummary.textContent = `共 ${state.changes.length} 个文件，合并为一次提交`;
+
+  pendingList.replaceChildren();
+
+  if (changesTab) {
+    const items = state.changes.filter(change => !query
+      || `${change.title} ${change.path}`.toLowerCase().includes(query));
+    if (!items.length) {
+      pendingList.append(h('p', { class: 'empty' }, query ? '没有匹配项' : '暂无待提交的数据改动'));
+    }
+    items.forEach(change => {
+      const info = describeChange(change);
+      pendingList.append(h('button', {
+        type: 'button',
+        class: 'item' + (change.id === state.selectedChangeId ? ' active' : ''),
+        onClick: () => selectChange(change),
+      },
+        h('div', { class: 'item-head' },
+          h('strong', {}, change.title),
+          h('span', { class: 'change-action' }, info.action)),
+        h('div', { class: 'item-meta' },
+          [change.kind === 'review' ? '评价' : '公司', (change.stagedAt || '').slice(0, 16).replace('T', ' ')].join(' · ')),
+      ));
+    });
+    pendingCount.textContent = `共 ${state.changes.length} 项待提交改动`;
+    submitChangesButton.disabled = state.busy || !state.changes.length;
+    loadMoreButton.hidden = true;
+    return;
+  }
 
   const matches = (company, project) => !query || `${company} ${project}`.toLowerCase().includes(query);
   const items = staged
     ? state.staging.filter(entry => matches(entry.company.name || '', projectName(entry.review, entry.company)))
     : visiblePending.filter(item => matches(item.view.company || '', item.view.project || ''));
 
-  pendingList.replaceChildren();
   if (!items.length) {
     pendingList.append(h('p', { class: 'empty' }, query ? '没有匹配项' : staged ? '暂存区为空' : '暂无待审提交'));
   }
@@ -325,7 +371,131 @@ function renderList() {
 function setTab(tab) {
   if (state.tab === tab) return;
   state.tab = tab;
+  state.selectedChangeId = null;
+  if (tab === 'changes') {
+    state.selected = null;
+    state.selectedId = null;
+    state.reviewId = null;
+    reviewForm.hidden = true;
+    detailEmpty.hidden = true;
+    changeDetail.hidden = false;
+    renderChangeDetail();
+    renderList();
+  } else {
+    changeDetail.hidden = true;
+    showEmptyDetail();
+  }
+  try {
+    const url = new URL(location.href);
+    if (tab === 'changes') url.searchParams.set('tab', 'changes');
+    else url.searchParams.delete('tab');
+    history.replaceState(null, '', url);
+  } catch {
+    // 忽略不支持修改 URL 的环境
+  }
+}
+
+function diffTable(rows) {
+  return h('table', { class: 'diff-table' },
+    h('thead', {}, h('tr', {}, h('th', {}, '字段'), h('th', {}, '原值'), h('th', {}, '新值'))),
+    h('tbody', {}, ...rows.map(row => h('tr', {},
+      h('td', { class: 'diff-label' }, row.label),
+      h('td', { class: 'diff-from' }, row.from),
+      h('td', { class: 'diff-to' }, row.to)))));
+}
+
+function renderChangeDetail() {
+  if (state.tab !== 'changes') return;
+  changeDetail.replaceChildren();
+  const change = state.changes.find(item => item.id === state.selectedChangeId);
+  if (!change) {
+    changeDetail.append(h('div', { class: 'empty' }, '选择左侧一项数据改动查看差异'));
+    return;
+  }
+  const info = describeChange(change);
+  changeDetail.append(h('div', { class: 'change-head' },
+    h('h2', {}, `${info.action} · ${change.title}`),
+    h('p', { class: 'count' }, `${change.kind === 'review' ? '评价文件' : '公司文件'} · ${change.path}`)));
+  if (info.rows.length) changeDetail.append(diffTable(info.rows));
+  if (info.projects.length) {
+    changeDetail.append(h('h3', {}, '项目改动'));
+    info.projects.forEach(project => {
+      changeDetail.append(h('div', { class: 'change-project' },
+        h('div', { class: 'change-project-head' },
+          h('strong', {}, project.name),
+          h('span', { class: 'change-action' },
+            project.kind === 'added' ? '新增' : project.kind === 'removed' ? '删除' : '修改')),
+        diffTable(project.rows)));
+    });
+  }
+  changeDetail.append(h('div', { class: 'actions' },
+    h('button', { type: 'button', class: 'ghost small', onClick: discardSelectedChange }, '撤销此改动')));
+}
+
+function selectChange(change) {
+  state.selectedChangeId = change.id;
+  state.selected = null;
+  state.selectedId = null;
+  state.reviewId = null;
+  reviewForm.hidden = true;
+  detailEmpty.hidden = true;
+  changeDetail.hidden = false;
+  renderChangeDetail();
   renderList();
+}
+
+function discardSelectedChange() {
+  const change = state.changes.find(item => item.id === state.selectedChangeId);
+  if (!change) return;
+  if (!window.confirm(`撤销「${change.title}」的待审改动？`)) return;
+  state.changes = discardChange(change.id);
+  state.selectedChangeId = null;
+  renderOverview();
+  renderChangeDetail();
+  renderList();
+  setStatus(globalStatus, '已撤销该条待审改动');
+}
+
+async function submitDataChanges() {
+  if (state.busy || !state.changes.length) return;
+  if (!window.confirm(`确认批量提交 ${state.changes.length} 个文件的改动？将合并为一次 GitHub 提交。`)) return;
+  const changes = [...state.changes];
+  setBusy(true);
+  setStatus(globalStatus, '正在批量提交数据改动…');
+  try {
+    const result = await publishFileChanges({ client: state.client, config, changes });
+    clearChanges();
+    state.changes = [];
+    state.selectedChangeId = null;
+    for (const change of changes) {
+      try {
+        await state.api.logEvent({
+          action: 'published_edit',
+          targetType: change.kind === 'review' ? 'review' : 'company',
+          targetId: change.kind === 'review' ? change.reviewId : change.companyId,
+          reviewId: change.kind === 'review' ? change.reviewId : null,
+          companyId: change.companyId || null,
+          note: '批量提交数据改动',
+          commitSha: result.commitSha || '',
+        });
+      } catch {
+        // 审计写入失败不阻塞批量提交
+      }
+    }
+    await loadData();
+    renderOverview();
+    renderList();
+    setStatus(globalStatus, `已批量提交 ${result.files} 个文件，展示站会自动重建（约 1–2 分钟）`);
+  } catch (error) {
+    if (error.status === 401) {
+      signOut('登录已失效，请重新登录。');
+      return;
+    }
+    setStatus(globalStatus, describeError(error), true);
+  } finally {
+    setBusy(false);
+    renderList();
+  }
 }
 
 function unstageItem(submissionId) {
@@ -582,6 +752,7 @@ function handleProjectBlur(text) {
 
 function renderDetail(item) {
   const view = item.view;
+  changeDetail.hidden = true;
   detailEmpty.hidden = true;
   reviewForm.hidden = false;
   setStatus(detailStatus, '');
@@ -642,11 +813,17 @@ function renderDetail(item) {
 }
 
 function showEmptyDetail() {
+  const changesTab = state.tab === 'changes';
   reviewForm.hidden = true;
-  detailEmpty.hidden = false;
+  detailEmpty.hidden = changesTab;
+  changeDetail.hidden = !changesTab;
   state.selected = null;
   state.selectedId = null;
   state.reviewId = null;
+  if (changesTab) {
+    state.selectedChangeId = null;
+    renderChangeDetail();
+  }
   clearReviewArtifacts();
   renderList();
   refreshGate();
@@ -687,6 +864,7 @@ function setBusy(busy) {
   state.busy = busy;
   rejectButton.disabled = busy;
   publishBatchButton.disabled = busy || !state.staging.length;
+  submitChangesButton.disabled = busy || !state.changes.length;
   loadMoreButton.disabled = busy;
   refreshGate();
 }
@@ -867,10 +1045,13 @@ async function loadData() {
     .filter(Boolean)
     .sort((a, b) => (b.raw.submittedAt || '').localeCompare(a.raw.submittedAt || ''));
   state.pendingTotal = pendingResult.total || 0;
+  state.changes = loadChanges();
+  state.selectedChangeId = null;
   state.counts = {
     pending: state.pendingTotal,
     requests: summary.requests || 0,
     contacts: summary.contacts || 0,
+    changes: state.changes.length,
   };
   renderOverview();
   state.selected = null;
@@ -1314,8 +1495,19 @@ window.addEventListener('pageshow', event => {
 filterInput.addEventListener('input', renderList);
 tabPending.addEventListener('click', () => setTab('pending'));
 tabStaged.addEventListener('click', () => setTab('staged'));
+tabChanges.addEventListener('click', () => setTab('changes'));
 stageButton.addEventListener('click', handleStage);
 publishBatchButton.addEventListener('click', publishStaged);
+submitChangesButton.addEventListener('click', submitDataChanges);
+overviewChanges.addEventListener('click', () => setTab('changes'));
+
+window.addEventListener('storage', event => {
+  if (event.key !== STORAGE_KEY) return;
+  state.changes = loadChanges();
+  renderOverview();
+  renderList();
+  if (state.tab === 'changes') renderChangeDetail();
+});
 reviewForm.addEventListener('submit', handleApprove);
 rejectButton.addEventListener('click', handleReject);
 rejectConfirmButton.addEventListener('click', handleRejectConfirm);

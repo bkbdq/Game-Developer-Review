@@ -5,7 +5,7 @@
     "/app.js",
     "/audit.js",
     "/requests.js",
-    "/published.js",
+    "/data.js",
     "/config.js",
     "/style.css",
     "/lib/*"

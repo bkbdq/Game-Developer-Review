@@ -1,6 +1,7 @@
 ---
 import Layout from '../components/Layout.astro';
 import Mark from '../components/Mark.astro';
+import { catalogArtwork } from '../lib/artwork';
 import ReviewRating from '../components/ReviewRating.astro';
 import { minimumRatingCount } from '../lib/project-stats';
 import { companyRatings, projectsByStudio } from '../lib/projects';
@@ -8,7 +9,7 @@ import { surveyUrl } from '../lib/survey';
 import '../styles/studios.css';
 import { href, index, companyAliases, scoreText, month } from '../lib/data';
 const sorted = index.companies.map(c => ({
-  ...c, aliases: companyAliases(c.id), titles: projectsByStudio.get(c.slug) ?? [],
+  ...c, aliases: companyAliases(c.id), art: catalogArtwork(c.id), titles: projectsByStudio.get(c.slug) ?? [],
   rating: companyRatings.get(c.id)!,
   mean: c.reviewCount ? Object.entries(c.scoreDistribution).reduce((sum,[score,count])=>sum + Number(score)*count,0) / c.reviewCount : -1,
 })).sort((a,b) => b.rating.gradeRank-a.rating.gradeRank || b.reviewCount-a.reviewCount || a.name.localeCompare(b.name,'zh-CN'));
@@ -19,9 +20,9 @@ const mostReviewed = sorted.reduce<(typeof sorted)[number] | undefined>((best,c)
 const bestRated = sorted.filter(c=>c.rating.rated).sort((a,b)=>b.mean-a.mean || b.reviewCount-a.reviewCount)[0];
 const awards = [
   { title: '评价最多', winner: mostReviewed, rule: '按累计评价篇数', empty: '暂无公开评价',
-    cover: mostReviewed?.titles[0]?.thumb, metric: mostReviewed && mostReviewed.reviewCount+' 篇评价', detail: mostReviewed?.rating.grade },
+    cover: mostReviewed?.art?.card ?? mostReviewed?.titles[0]?.thumb, metric: mostReviewed && mostReviewed.reviewCount+' 篇评价', detail: mostReviewed?.rating.grade },
   { title: '评价最好', winner: bestRated, rule: `至少 ${minimumRatingCount} 篇评价，按平均分`, empty: '暂无达标公司',
-    cover: (bestRated === mostReviewed && bestRated?.titles[1]?.thumb) || bestRated?.titles[0]?.thumb,
+    cover: bestRated?.art?.card ?? ((bestRated === mostReviewed && bestRated?.titles[1]?.thumb) || bestRated?.titles[0]?.thumb),
     metric: bestRated && scoreText(bestRated.avgScore)+' / 5', detail: bestRated && bestRated.reviewCount+' 篇评价' },
 ];
 ---
@@ -46,7 +47,7 @@ const awards = [
     <div class="studio-grid" id="companies">
       {sorted.map(c=><a class="company-card studio-tile" href={href('company/' + c.slug + '/')}
         data-name={[c.name,c.slug,...c.aliases].join(' ').normalize('NFKC').toLocaleLowerCase()} data-count={c.reviewCount} data-updated={updatedOrder.get(c.id)}>
-        <div class="studio-tile-art">{c.titles[0]?.thumb && <img loading="lazy" decoding="async" src={c.titles[0].thumb} alt=""/>}
+        <div class="studio-tile-art">{(c.art?.card || c.titles[0]?.thumb) && <img loading="lazy" decoding="async" src={c.art?.card || c.titles[0].thumb} alt=""/>}
           <span class="studio-tile-score"><ReviewRating rating={c.rating}/></span>
         </div>
         <div class="studio-tile-body">

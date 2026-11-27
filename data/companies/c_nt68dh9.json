@@ -9,8 +9,13 @@
       "id": "p_ai-lab-6920px",
       "name": "互娱AI Lab",
       "status": "dev"
+    },
+    {
+      "id": "p_nvua41r",
+      "name": "逆水寒",
+      "status": "live"
     }
   ],
   "createdAt": "2026-11-26",
-  "updatedAt": "2026-11-26"
+  "updatedAt": "2026-11-27"
 }

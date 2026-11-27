@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_nclv4st",
+  "slug": "nclv4st",
+  "name": "英雄游戏",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_n0vlo95",
+      "name": "二重螺旋",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

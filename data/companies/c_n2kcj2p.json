@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_n2kcj2p",
+  "slug": "n2kcj2p",
+  "name": "南堂羽星溯",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_ntoxd77",
+      "name": "星溯",
+      "status": "dev"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_ngw77vx",
+  "slug": "ngw77vx",
+  "name": "杭州游卡",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_np33b9d",
+      "name": "三国杀",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

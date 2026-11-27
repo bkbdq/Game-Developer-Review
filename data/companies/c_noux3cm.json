@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_noux3cm",
+  "slug": "noux3cm",
+  "name": "永航科技",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_qq-x34s66",
+      "name": "QQ炫舞",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

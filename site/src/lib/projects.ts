@@ -1,4 +1,5 @@
 import { companyAliases, detail, href, index } from './data';
+import { catalogArtwork } from './artwork';
 import { compareProjects, isRecentPick, projectStats } from './project-stats';
 
 const artwork: Record<string, [string, string]> = {
@@ -23,12 +24,14 @@ export const projects = studios.flatMap(({company:c, data, rating}) => {
     const featuredReview = reviews.find(r=>r.id===project.featuredReviewId)
       ?? reviews.find(r=>r.score>=4) ?? reviews[0];
     const art = artwork[project.id];
-    const thumb = art && href(`images/projects/${art[1]}-1.webp`);
-    const cover = art && href('images/projects/' + (project.id === 'p_kite' ? 'kite-cover' : art[1] + '-1') + '.webp');
-    const scene = art && href(`images/projects/${art[1]}-2.webp`);
+    const configured = catalogArtwork(c.id, project.id);
+    const thumb = configured?.card ?? (art && href(`images/projects/${art[1]}-1.webp`));
+    const cover = configured?.cover ?? (art && href('images/projects/' + (project.id === 'p_kite' ? 'kite-cover' : art[1] + '-1') + '.webp'));
+    const scene = configured?.card ?? (art && href(`images/projects/${art[1]}-2.webp`));
     return {
       id: project.id, name: project.name, statusKey: project.status, status: statuses[project.status] || statuses.unknown,
       company: c.name, companyRating:rating, slug:c.slug, aliases, reviews, featuredReview, cover, thumb, scene,
+      detailArt: configured?.detail, cardArt: configured?.card,
       path:href(`project/${encodeURIComponent(c.slug)}/${encodeURIComponent(project.id)}/`),
       search:[c.name,c.slug,...aliases,project.name,...(project.aliases ?? []),art?.[0]].join(' ').normalize('NFKC').toLocaleLowerCase(),
       ...projectStats(reviews,asOf)

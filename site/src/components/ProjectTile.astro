@@ -7,7 +7,7 @@ interface Props { project: Project; inStudio?: boolean; recommended?: boolean }
 const {project:p, inStudio=false, recommended} = Astro.props;
 ---
 <article class="project-tile" data-project={p.search} data-pick={recommended ? 'true' : undefined} hidden={recommended===false}>
-  <span class="tile-frame"><ProjectCover project={p} src={recommended ? p.scene : undefined}/>
+  <span class="tile-frame"><ProjectCover project={p} src={recommended ? p.scene : p.cardArt}/>
     {p.reviews[0] && <span class="tile-peek"><small>最近评价</small><span>{p.reviews[0].title || p.reviews[0].comment}</span><b>查看全部评价 →</b></span>}
   </span>
   <div class="tile-body">

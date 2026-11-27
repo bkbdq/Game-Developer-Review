@@ -49,6 +49,7 @@ const filterInput = $('#filter');
 const refreshButton = $('#refresh-button');
 const deployButton = $('#deploy-button');
 const localMode = ['127.0.0.1', 'localhost', '::1'].includes(location.hostname);
+$('#artwork-link').hidden = !localMode;
 const pendingList = $('#pending-list');
 const loadMoreButton = $('#load-more');
 const pendingCount = $('#pending-count');

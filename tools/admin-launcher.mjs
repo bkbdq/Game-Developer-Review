@@ -3,10 +3,12 @@ import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { dirname, extname, join, normalize, resolve } from 'node:path';
+import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createArtworkLibrary } from './artwork-library.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const artwork = createArtworkLibrary(ROOT);
 const ADMIN_DIR = join(ROOT, 'admin');
 const DEPLOY_DIR = resolve(ROOT, '..', '.gdr-deploy');
 const API_ORIGIN = (process.env.ADMIN_API_ORIGIN || 'https://admin.goodcorp.games').replace(/\/$/, '');
@@ -72,7 +74,7 @@ async function proxy(req, res, url) {
   const target = `${API_ORIGIN}${url.pathname}${url.search}`;
   const headers = {};
   for (const [key, value] of Object.entries(req.headers)) {
-    if (key === 'host' || key === 'content-length' || key === 'connection') continue;
+    if (key === 'host' || key === 'content-length' || key === 'connection' || key === 'cookie') continue;
     headers[key] = value;
   }
   try {
@@ -205,7 +207,8 @@ async function serveStatic(req, res, url) {
   const pathname = decodeURIComponent(url.pathname);
   const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   const full = normalize(join(ADMIN_DIR, relative));
-  if (!full.startsWith(ADMIN_DIR)) return json(res, 403, { ok: false, message: 'Forbidden' });
+  if (!full.startsWith(ADMIN_DIR + sep) || relative.split(/[\\/]/).some(p => p.startsWith('.') || p === 'functions') ||
+      !Object.hasOwn(MIME, extname(full).toLowerCase())) return json(res, 404, { ok: false, message: 'Not Found' });
 
   try {
     const info = await stat(full);
@@ -256,7 +259,8 @@ function openBrowser(url) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${HOST}`);
-  if (url.pathname.startsWith('/api/admin/')) return proxy(req, res, url);
+  if (url.pathname.startsWith('/api/local/artwork/')) return artwork.handle(req, res, url);
+  if (url.pathname.startsWith('/api/admin/') || (url.pathname.startsWith('/api/artwork/') && ['GET','HEAD'].includes(req.method))) return proxy(req, res, url);
   if (url.pathname === '/api/local/deploy' && req.method === 'POST') return deploySite(req, res);
   if (url.pathname === '/api/local/status') {
     const secrets = findSecrets();
@@ -270,6 +274,8 @@ const server = createServer(async (req, res) => {
 });
 
 function listen(port, attempts) {
+  // The artwork handler has captured the credential. Builds and other children do not need it.
+  delete process.env.DEEPSEEK_API_KEY;
   server.once('error', error => {
     if (error.code === 'EADDRINUSE' && attempts > 0) {
       console.warn(`端口 ${port} 被占用，尝试 ${port + 1}`);
@@ -283,7 +289,7 @@ function listen(port, attempts) {
     const url = `http://${HOST}:${port}/`;
     console.log(`本地审核控制台已启动：${url}`);
     console.log('关闭窗口或按 Ctrl+C 停止。');
-    if (!process.env.ADMIN_NO_OPEN) openBrowser(url);
+    if (!process.env.ADMIN_NO_OPEN) openBrowser(process.env.ADMIN_ARTWORK === '1' ? url + 'artwork.html' : url);
   });
 }
 
@@ -306,6 +312,7 @@ if (proxyUrl && !process.env.GDR_ADMIN_PROXY_ACTIVE) {
         HTTPS_PROXY: proxyUrl,
       },
     });
+    delete process.env.DEEPSEEK_API_KEY;
     child.on('exit', code => process.exit(code ?? 0));
   } else {
     console.warn(`检测到系统代理 ${proxyUrl}，但当前 Node 版本不支持自动使用代理，建议升级到 Node.js 24 或更高版本。`);

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_neobsx2",
+  "slug": "neobsx2",
+  "name": "浙江岚希科技",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_nej4zl6",
+      "name": "沐光石之书",
+      "status": "dev"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_nhni2wu",
+  "slug": "nhni2wu",
+  "name": "星猫科技",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_nt2xi8j",
+      "name": "青天井",
+      "status": "live"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

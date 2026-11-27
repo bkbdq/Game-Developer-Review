@@ -3,6 +3,8 @@
   "include": ["/*"],
   "exclude": [
     "/app.js",
+    "/artwork.js",
+    "/artwork.css",
     "/audit.js",
     "/requests.js",
     "/data.js",

@@ -16,7 +16,7 @@ const writeUrl = surveyUrl(p.company,p.name);
 ---
 <Layout title={p.name} active="projects" company={p.company} project={p.name} dark>
   <nav class="project-crumb" aria-label="面包屑"><a href={href()}>项目发现</a> / <a href={href('company/'+p.slug+'/')}>{p.company}</a> / {p.name}</nav>
-  <header class="project-mast"><ProjectCover project={p} eager/><div>
+  <header class="project-mast"><ProjectCover project={p} src={p.detailArt} eager/><div>
     <a class="studio-link" href={href('company/'+p.slug+'/')}>{p.company} ↗</a>
     <h1>{p.name}</h1><ProjectStatus status={p.statusKey}/>
     <RatingDetails rating={p}/>

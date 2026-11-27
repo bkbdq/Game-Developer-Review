@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "c_n30qamk",
+  "slug": "n30qamk",
+  "name": "乐元素",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_ncx8ec7",
+      "name": "白银之城",
+      "status": "dev"
+    },
+    {
+      "id": "p_super-nova",
+      "name": "SUPER NOVA",
+      "status": "dev"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

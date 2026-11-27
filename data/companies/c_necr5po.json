@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "c_necr5po",
+  "slug": "necr5po",
+  "name": "北京像素软件",
+  "aliases": [],
+  "projects": [
+    {
+      "id": "p_nu4gj99",
+      "name": "星际理想国",
+      "status": "dev"
+    }
+  ],
+  "createdAt": "2026-11-27",
+  "updatedAt": "2026-11-27"
+}

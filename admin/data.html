@@ -56,6 +56,7 @@
         <div class="toolbar data-toolbar">
           <input id="review-search" type="search" placeholder="搜索公司 / 项目 / 标题 / 正文" autocomplete="off">
           <select id="review-company-filter" aria-label="按公司筛选"><option value="">全部公司</option></select>
+          <select id="review-project-filter" aria-label="按项目筛选"><option value="">全部项目</option></select>
           <select id="review-score-filter" aria-label="按评分筛选">
             <option value="">全部评分</option>
             <option value="5">5 星</option>
@@ -64,49 +65,8 @@
             <option value="2">2 星</option>
             <option value="1">1 星</option>
           </select>
-          <label class="date-field"><input id="review-dirty-only" type="checkbox">仅看已修改</label>
-          <button id="review-save-button" type="button" disabled>保存修改（0）</button>
           <button id="review-refresh" type="button" class="ghost">刷新</button>
           <span id="review-count" class="count"></span>
-        </div>
-
-        <div id="review-batch" class="batch-bar" hidden>
-          <strong id="batch-selected">已选 0 条</strong>
-          <label class="batch-field">评分
-            <select id="batch-score">
-              <option value="">不修改</option>
-              <option value="5">5</option>
-              <option value="4">4</option>
-              <option value="3">3</option>
-              <option value="2">2</option>
-              <option value="1">1</option>
-            </select>
-          </label>
-          <label class="batch-field">项目
-            <select id="batch-project">
-              <option value="__keep">不修改</option>
-            </select>
-          </label>
-          <label class="batch-field">发布日期
-            <input id="batch-date" type="date">
-          </label>
-          <label class="batch-field">在职时长
-            <select id="batch-tenure">
-              <option value="__keep">不修改</option>
-              <option value="__clear">清空</option>
-            </select>
-          </label>
-          <label class="batch-field">标签
-            <select id="batch-tags-mode">
-              <option value="__keep">不修改</option>
-              <option value="add">追加</option>
-              <option value="replace">替换为</option>
-              <option value="clear">清空</option>
-            </select>
-          </label>
-          <div id="batch-tags" class="checks batch-tags" hidden></div>
-          <button id="batch-apply" type="button">应用到选中</button>
-          <button id="batch-clear" type="button" class="ghost">取消选择</button>
         </div>
 
         <div class="panel data-panel">
@@ -114,16 +74,11 @@
             <table class="data-table review-table">
               <thead>
                 <tr>
-                  <th class="cell-select"><input id="review-select-all" type="checkbox" aria-label="全选当前列表"></th>
                   <th>公司</th>
                   <th>项目</th>
+                  <th>评价</th>
                   <th>评分</th>
-                  <th>标题</th>
-                  <th>正文</th>
-                  <th>标签</th>
                   <th>发布日期</th>
-                  <th>在职时长</th>
-                  <th>版本</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -137,8 +92,6 @@
       <section id="view-companies" hidden>
         <div class="toolbar data-toolbar">
           <input id="company-search" type="search" placeholder="搜索公司名 / ID / slug / 别名" autocomplete="off">
-          <label class="date-field"><input id="company-dirty-only" type="checkbox">仅看已修改</label>
-          <button id="company-save-button" type="button" disabled>保存修改（0）</button>
           <button id="company-refresh" type="button" class="ghost">刷新</button>
           <span id="company-count" class="count"></span>
         </div>
@@ -148,10 +101,8 @@
             <table class="data-table company-table">
               <thead>
                 <tr>
-                  <th>公司名</th>
-                  <th>公司 ID</th>
-                  <th>slug</th>
-                  <th>别名（逗号分隔）</th>
+                  <th>公司名称</th>
+                  <th>别名</th>
                   <th>项目数</th>
                   <th>评价数</th>
                   <th>最近更新</th>
@@ -167,10 +118,9 @@
       <!-- 项目 -->
       <section id="view-projects" hidden>
         <div class="toolbar data-toolbar">
-          <input id="project-search" type="search" placeholder="搜索项目名 / 项目 ID / 公司" autocomplete="off">
+          <input id="project-search" type="search" placeholder="搜索项目名 / 别名 / 项目 ID / 公司" autocomplete="off">
           <select id="project-company-filter" aria-label="按公司筛选"><option value="">全部公司</option></select>
           <button id="project-new-button" type="button" class="ghost">＋ 新增项目</button>
-          <button id="project-save-button" type="button" disabled>保存修改（0）</button>
           <button id="project-refresh" type="button" class="ghost">刷新</button>
           <span id="project-count" class="count"></span>
         </div>
@@ -203,11 +153,11 @@
             <table class="data-table project-table">
               <thead>
                 <tr>
-                  <th>公司</th>
-                  <th>项目名</th>
-                  <th>项目 ID</th>
+                  <th>项目名称</th>
+                  <th>别名</th>
+                  <th>公司名称</th>
                   <th>状态</th>
-                  <th>评价数</th>
+                  <th>评价数量</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -220,6 +170,131 @@
       <p id="global-status" class="status" role="status"></p>
     </section>
   </main>
+
+  <dialog id="review-dialog" class="modal" aria-labelledby="review-dialog-title">
+    <form id="review-dialog-form">
+      <header class="modal-head">
+        <h2 id="review-dialog-title">修改评价</h2>
+        <button id="review-dialog-close" type="button" class="ghost small">关闭</button>
+      </header>
+      <p id="review-dialog-meta" class="count"></p>
+
+      <div class="grid">
+        <label>公司
+          <input id="review-dialog-company" readonly>
+        </label>
+        <label>项目
+          <select id="review-dialog-project"></select>
+        </label>
+        <label>评分
+          <select id="review-dialog-score">
+            <option value="5">5</option>
+            <option value="4">4</option>
+            <option value="3">3</option>
+            <option value="2">2</option>
+            <option value="1">1</option>
+          </select>
+        </label>
+      </div>
+
+      <label>标题（选填，40 字以内）
+        <input id="review-dialog-title-input" maxlength="40" autocomplete="off">
+      </label>
+
+      <label>评价正文
+        <textarea id="review-dialog-comment" rows="8" maxlength="2000"></textarea>
+      </label>
+      <p id="review-dialog-sensitive" class="status" role="status"></p>
+
+      <div class="grid">
+        <label>发布日期
+          <input id="review-dialog-date" type="date">
+        </label>
+        <label>在职时长
+          <select id="review-dialog-tenure">
+            <option value="">不填</option>
+          </select>
+        </label>
+      </div>
+
+      <fieldset>
+        <legend>标签</legend>
+        <div id="review-dialog-tags" class="checks"></div>
+      </fieldset>
+
+      <div class="actions">
+        <button type="submit">保存修改</button>
+        <button id="review-dialog-revert" type="button" class="ghost">还原</button>
+        <button id="review-dialog-cancel" type="button" class="ghost">取消</button>
+      </div>
+      <p id="review-dialog-status" class="status" role="status"></p>
+    </form>
+  </dialog>
+
+  <dialog id="company-dialog" class="modal" aria-labelledby="company-dialog-title">
+    <form id="company-dialog-form">
+      <header class="modal-head">
+        <h2 id="company-dialog-title">修改公司</h2>
+        <button id="company-dialog-close" type="button" class="ghost small">关闭</button>
+      </header>
+      <p id="company-dialog-meta" class="count"></p>
+
+      <label>公司名
+        <input id="company-dialog-name" maxlength="50" autocomplete="off">
+      </label>
+      <label>slug（公司页 URL）
+        <input id="company-dialog-slug" autocomplete="off" spellcheck="false">
+      </label>
+      <label>别名（逗号分隔，仅用于站内搜索）
+        <input id="company-dialog-aliases" autocomplete="off">
+      </label>
+
+      <div class="actions">
+        <button type="submit">保存修改</button>
+        <button id="company-dialog-cancel" type="button" class="ghost">取消</button>
+        <button id="company-dialog-delete" type="button" class="danger">删除公司</button>
+      </div>
+      <p id="company-dialog-delete-hint" class="status"></p>
+      <p id="company-dialog-status" class="status" role="status"></p>
+    </form>
+  </dialog>
+
+  <dialog id="project-dialog" class="modal" aria-labelledby="project-dialog-title">
+    <form id="project-dialog-form">
+      <header class="modal-head">
+        <h2 id="project-dialog-title">修改项目</h2>
+        <button id="project-dialog-close" type="button" class="ghost small">关闭</button>
+      </header>
+      <p id="project-dialog-meta" class="count"></p>
+
+      <div class="grid">
+        <label>公司
+          <input id="project-dialog-company" readonly>
+        </label>
+        <label>项目名称
+          <input id="project-dialog-name" maxlength="50" autocomplete="off">
+        </label>
+        <label>状态
+          <select id="project-dialog-status">
+            <option value="live">已上线</option>
+            <option value="dev">在研</option>
+            <option value="cancelled">已取消</option>
+            <option value="unknown">状态未知</option>
+          </select>
+        </label>
+      </div>
+
+      <label>别名（逗号分隔，仅用于站内搜索）
+        <input id="project-dialog-aliases" autocomplete="off">
+      </label>
+
+      <div class="actions">
+        <button type="submit">保存修改</button>
+        <button id="project-dialog-cancel" type="button" class="ghost">取消</button>
+      </div>
+      <p id="project-dialog-message" class="status" role="status"></p>
+    </form>
+  </dialog>
 
   <script type="module" src="/data.js"></script>
 </body>

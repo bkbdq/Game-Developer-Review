@@ -18,6 +18,7 @@ export type ReviewFile = {
   tags?: string[];
   publishedAt: string;
   revision: number;
+  hidden?: boolean;
 };
 
 export type CompanyFile = {
@@ -26,10 +27,13 @@ export type CompanyFile = {
   slug: string;
   name: string;
   aliases?: string[];
+  hidden?: boolean;
   projects: ({
     id: string;
     name: string;
     status: "live" | "dev" | "cancelled" | "unknown";
+    aliases?: string[];
+    hidden?: boolean;
     genre?: string;
     featuredReviewId?: string;
   })[];

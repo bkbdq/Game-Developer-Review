@@ -10,15 +10,10 @@ import {
   parseAliases,
   composeReview,
   reviewContentChanged,
-  referencedProjectIds,
   composeCompany,
   companyContentChanged,
+  composeProject,
   newProjectId,
-  reviewSnapshot,
-  reviewSnapshotChanged,
-  projectSnapshot,
-  projectSnapshotKey,
-  composeProjects,
 } from './lib/published.js';
 
 const PROJECT_STATUSES = [
@@ -28,6 +23,7 @@ const PROJECT_STATUSES = [
   ['unknown', '状态未知'],
 ];
 
+const PROJECT_STATUS_LABEL = Object.fromEntries(PROJECT_STATUSES);
 const VIEWS = ['reviews', 'companies', 'projects'];
 
 const $ = selector => document.querySelector(selector);
@@ -54,27 +50,13 @@ const globalStatus = $('#global-status');
 
 const reviewSearch = $('#review-search');
 const reviewCompanyFilter = $('#review-company-filter');
+const reviewProjectFilter = $('#review-project-filter');
 const reviewScoreFilter = $('#review-score-filter');
-const reviewDirtyOnly = $('#review-dirty-only');
-const reviewSaveButton = $('#review-save-button');
 const reviewRefresh = $('#review-refresh');
 const reviewCount = $('#review-count');
-const reviewBatch = $('#review-batch');
-const batchSelected = $('#batch-selected');
-const batchScore = $('#batch-score');
-const batchProject = $('#batch-project');
-const batchDate = $('#batch-date');
-const batchTenure = $('#batch-tenure');
-const batchTagsMode = $('#batch-tags-mode');
-const batchTags = $('#batch-tags');
-const batchApply = $('#batch-apply');
-const batchClear = $('#batch-clear');
-const reviewSelectAll = $('#review-select-all');
 const reviewRows = $('#review-rows');
 
 const companySearch = $('#company-search');
-const companyDirtyOnly = $('#company-dirty-only');
-const companySaveButton = $('#company-save-button');
 const companyRefresh = $('#company-refresh');
 const companyCount = $('#company-count');
 const companyRows = $('#company-rows');
@@ -82,7 +64,6 @@ const companyRows = $('#company-rows');
 const projectSearch = $('#project-search');
 const projectCompanyFilter = $('#project-company-filter');
 const projectNewButton = $('#project-new-button');
-const projectSaveButton = $('#project-save-button');
 const projectRefresh = $('#project-refresh');
 const projectCount = $('#project-count');
 const projectRows = $('#project-rows');
@@ -93,16 +74,55 @@ const newProjectStatus = $('#new-project-status');
 const newProjectAdd = $('#new-project-add');
 const newProjectCancel = $('#new-project-cancel');
 
+const reviewDialog = $('#review-dialog');
+const reviewDialogForm = $('#review-dialog-form');
+const reviewDialogMeta = $('#review-dialog-meta');
+const reviewDialogCompany = $('#review-dialog-company');
+const reviewDialogProject = $('#review-dialog-project');
+const reviewDialogScore = $('#review-dialog-score');
+const reviewDialogTitle = $('#review-dialog-title-input');
+const reviewDialogComment = $('#review-dialog-comment');
+const reviewDialogSensitive = $('#review-dialog-sensitive');
+const reviewDialogDate = $('#review-dialog-date');
+const reviewDialogTenure = $('#review-dialog-tenure');
+const reviewDialogTags = $('#review-dialog-tags');
+const reviewDialogStatus = $('#review-dialog-status');
+const reviewDialogRevert = $('#review-dialog-revert');
+const reviewDialogCancel = $('#review-dialog-cancel');
+const reviewDialogClose = $('#review-dialog-close');
+
+const companyDialog = $('#company-dialog');
+const companyDialogForm = $('#company-dialog-form');
+const companyDialogMeta = $('#company-dialog-meta');
+const companyDialogName = $('#company-dialog-name');
+const companyDialogSlug = $('#company-dialog-slug');
+const companyDialogAliases = $('#company-dialog-aliases');
+const companyDialogDelete = $('#company-dialog-delete');
+const companyDialogDeleteHint = $('#company-dialog-delete-hint');
+const companyDialogStatus = $('#company-dialog-status');
+const companyDialogCancel = $('#company-dialog-cancel');
+const companyDialogClose = $('#company-dialog-close');
+
+const projectDialog = $('#project-dialog');
+const projectDialogForm = $('#project-dialog-form');
+const projectDialogMeta = $('#project-dialog-meta');
+const projectDialogCompany = $('#project-dialog-company');
+const projectDialogName = $('#project-dialog-name');
+const projectDialogStatusSelect = $('#project-dialog-status');
+const projectDialogAliases = $('#project-dialog-aliases');
+const projectDialogCancel = $('#project-dialog-cancel');
+const projectDialogClose = $('#project-dialog-close');
+const projectDialogMessage = $('#project-dialog-message');
+
 const state = {
   client: null,
   api: null,
   taxonomy: null,
   companies: new Map(),
   reviews: new Map(),
-  reviewDrafts: new Map(),
-  companyDrafts: new Map(),
-  projectDrafts: new Map(),
-  selected: new Set(),
+  editingReviewId: null,
+  editingCompanyId: null,
+  editingProject: null,
   view: 'reviews',
   busy: false,
 };
@@ -214,6 +234,23 @@ function refreshCompanySelects() {
   fillCompanySelect(newProjectCompany);
 }
 
+function refreshReviewProjectFilter() {
+  const companyId = reviewCompanyFilter.value;
+  const previous = reviewProjectFilter.value;
+  const options = [h('option', { value: '' }, '全部项目')];
+  sortedCompanies().forEach(entry => {
+    if (companyId && entry.data.id !== companyId) return;
+    (entry.data.projects || []).forEach(project => {
+      options.push(h('option', {
+        value: project.id,
+      }, companyId ? project.name : `${entry.data.name} · ${project.name}`));
+    });
+  });
+  reviewProjectFilter.replaceChildren(...options);
+  const exists = options.some(option => option.value === previous);
+  reviewProjectFilter.value = exists ? previous : '';
+}
+
 function reviewCountForCompany(companyId) {
   let count = 0;
   state.reviews.forEach(entry => {
@@ -225,21 +262,73 @@ function reviewCountForCompany(companyId) {
 function reviewCountForProject(companyId, projectId) {
   let count = 0;
   state.reviews.forEach(entry => {
-    if (entry.data.companyId === companyId && !entry.data.projectAnonymous && entry.data.projectId === projectId) count += 1;
+    if (entry.data.companyId === companyId
+      && !entry.data.projectAnonymous
+      && entry.data.projectId === projectId) count += 1;
   });
   return count;
+}
+
+function withHidden(data) {
+  const next = JSON.parse(JSON.stringify(data));
+  if (next.hidden) delete next.hidden;
+  else next.hidden = true;
+  return next;
+}
+
+function hiddenBadge(data) {
+  return data.hidden ? h('span', { class: 'badge hidden-badge' }, '已隐藏') : null;
+}
+
+function countButton(count, onClick, title = '查看评价列表') {
+  return h('button', { type: 'button', class: 'link-button', title, onClick }, `${count} 条`);
 }
 
 function setBusy(busy) {
   state.busy = busy;
   appView.classList.toggle('is-busy', busy);
   [viewReviews, viewCompanies, viewProjects].forEach(element => { element.inert = busy; });
+  [reviewDialogForm, companyDialogForm, projectDialogForm].forEach(form => { form.inert = busy; });
   reviewRefresh.disabled = busy;
   companyRefresh.disabled = busy;
   projectRefresh.disabled = busy;
-  updateReviewSaveButton();
-  updateCompanySaveButton();
-  updateProjectSaveButton();
+}
+
+async function writeReviewFile(entry, next, message, note) {
+  const file = await state.client.putFile(config.owner, config.publicRepo, entry.path, {
+    message,
+    content: JSON.stringify(next, null, 2) + '\n',
+    sha: entry.sha,
+    branch: config.publicBranch,
+  });
+  entry.data = next;
+  entry.sha = file?.content?.sha || entry.sha;
+  await logAudit('published_edit', {
+    targetType: 'review',
+    targetId: next.id,
+    reviewId: next.id,
+    companyId: next.companyId,
+    note,
+    commitSha: file?.commit?.sha || '',
+  });
+}
+
+async function writeCompanyFile(entry, next, message, note) {
+  const file = await state.client.putFile(config.owner, config.publicRepo, entry.path, {
+    message,
+    content: JSON.stringify(next, null, 2) + '\n',
+    sha: entry.sha,
+    branch: config.publicBranch,
+  });
+  entry.data = next;
+  entry.sha = file?.content?.sha || entry.sha;
+  await logAudit('published_edit', {
+    targetType: 'company',
+    targetId: next.id,
+    companyId: next.id,
+    note,
+    commitSha: file?.commit?.sha || '',
+  });
 }
 
 // ── 视图切换 ──────────────────────────────────────────────────────────────
@@ -259,6 +348,7 @@ function showView(view) {
     // 某些环境禁止修改 URL，忽略即可
   }
   refreshCompanySelects();
+  refreshReviewProjectFilter();
   renderAll();
 }
 
@@ -266,7 +356,7 @@ function updateTabCounts() {
   tabReviewCount.textContent = String(state.reviews.size);
   tabCompanyCount.textContent = String(state.companies.size);
   let projects = 0;
-  state.projectDrafts.forEach(rows => { projects += rows.length; });
+  state.companies.forEach(entry => { projects += (entry.data.projects || []).length; });
   tabProjectCount.textContent = String(projects);
 }
 
@@ -278,22 +368,12 @@ function renderAll() {
 }
 
 function hasDirty() {
-  return reviewDirtyIds().length > 0
-    || dirtyCompanyIds().length > 0
-    || dirtyProjectCompanyIds().length > 0;
+  return (reviewDialog.open && reviewDialogChanged())
+    || (companyDialog.open && companyDialogChanged())
+    || (projectDialog.open && projectDialogChanged());
 }
 
 // ── 评价表 ────────────────────────────────────────────────────────────────
-
-function isReviewDirty(id) {
-  const entry = state.reviews.get(id);
-  const draft = state.reviewDrafts.get(id);
-  return Boolean(entry && draft && reviewSnapshotChanged(entry.data, draft));
-}
-
-function reviewDirtyIds() {
-  return [...state.reviews.keys()].filter(id => isReviewDirty(id));
-}
 
 function reviewProjectName(entry) {
   const data = entry.data;
@@ -307,14 +387,14 @@ function reviewProjectName(entry) {
 function visibleReviews() {
   const query = reviewSearch.value.trim().toLowerCase();
   const companyId = reviewCompanyFilter.value;
+  const projectId = reviewProjectFilter.value;
   const score = reviewScoreFilter.value;
-  const dirtyOnly = reviewDirtyOnly.checked;
   return [...state.reviews.values()]
     .filter(entry => {
       const data = entry.data;
       if (companyId && data.companyId !== companyId) return false;
+      if (projectId && (data.projectAnonymous || data.projectId !== projectId)) return false;
       if (score && String(data.score) !== score) return false;
-      if (dirtyOnly && !isReviewDirty(data.id)) return false;
       if (!query) return true;
       const company = state.companies.get(data.companyId);
       const haystack = [
@@ -331,101 +411,46 @@ function visibleReviews() {
       || b.data.id.localeCompare(a.data.id));
 }
 
-function bindDraftInput(row, id, element, apply, eventName = 'input') {
-  element.addEventListener(eventName, () => {
-    apply();
-    row.classList.toggle('dirty', isReviewDirty(id));
-    updateReviewSaveButton();
-  });
-}
-
-function buildTagCell(row, id, draft) {
-  const tags = state.taxonomy?.tags || [];
-  const summary = h('summary');
-  const paintSummary = () => {
-    const labels = tags.filter(tag => draft.tags.includes(tag.key)).map(tag => tag.label);
-    summary.textContent = labels.length ? labels.join('、') : '无标签';
-  };
-  const box = h('div', { class: 'checks tag-checks' });
-  tags.forEach(tag => {
-    const checkbox = h('input', { type: 'checkbox', value: tag.key });
-    checkbox.checked = draft.tags.includes(tag.key);
-    checkbox.addEventListener('change', () => {
-      const next = new Set(draft.tags);
-      if (checkbox.checked) next.add(tag.key);
-      else next.delete(tag.key);
-      draft.tags = [...next].sort();
-      paintSummary();
-      row.classList.toggle('dirty', isReviewDirty(id));
-      updateReviewSaveButton();
-    });
-    box.append(h('label', {}, checkbox, tag.label));
-  });
-  paintSummary();
-  return h('td', { class: 'cell-tags' }, h('details', { class: 'tag-picker' }, summary, box));
+function clip(text, max = 160) {
+  const source = String(text || '').replace(/\s+/g, ' ').trim();
+  return source.length > max ? `${source.slice(0, max)}…` : source;
 }
 
 function buildReviewRow(entry) {
-  const id = entry.data.id;
   const data = entry.data;
   const company = state.companies.get(data.companyId) || null;
-  const draft = state.reviewDrafts.get(id) || reviewSnapshot(data);
-  const row = h('tr', { dataset: { id } });
+  const row = h('tr', { dataset: { id: data.id } });
 
-  const selectBox = h('input', { type: 'checkbox', class: 'review-select', 'aria-label': `选择评价 ${id}` });
-  selectBox.checked = state.selected.has(id);
-  selectBox.addEventListener('change', () => {
-    if (selectBox.checked) state.selected.add(id);
-    else state.selected.delete(id);
-    syncSelectAll();
-    renderBatchBar();
-  });
-  row.append(h('td', { class: 'cell-select' }, selectBox));
+  const reviewCell = h('td', { class: 'cell-review' });
+  if (data.title) reviewCell.append(h('strong', {}, data.title));
+  reviewCell.append(h('div', { class: 'review-text' }, clip(data.comment)));
 
-  row.append(h('td', { class: 'cell-company' },
-    h('strong', {}, company?.data.name || '（公司缺失）'),
-    h('div', { class: 'cell-id' }, data.companyId || '—')));
-
-  const projectOptions = [['__none', '不关联项目'], ['__anon', '匿名项目']];
-  (company?.data.projects || []).forEach(project => projectOptions.push([project.id, project.name]));
-  if (!['__none', '__anon'].includes(draft.project)
-    && !(company?.data.projects || []).some(project => project.id === draft.project)) {
-    projectOptions.push([draft.project, `未知项目 ${draft.project}`]);
-  }
-  const projectSelect = buildSelect(projectOptions, draft.project);
-  bindDraftInput(row, id, projectSelect, () => { draft.project = projectSelect.value; }, 'change');
-  row.append(h('td', {}, projectSelect));
-
-  const scoreSelect = buildSelect([['5', '5'], ['4', '4'], ['3', '3'], ['2', '2'], ['1', '1']], draft.score);
-  bindDraftInput(row, id, scoreSelect, () => { draft.score = scoreSelect.value; }, 'change');
-  row.append(h('td', { class: 'cell-narrow' }, scoreSelect));
-
-  const titleInput = h('input', { type: 'text', maxLength: 40, value: draft.title, autocomplete: 'off' });
-  bindDraftInput(row, id, titleInput, () => { draft.title = titleInput.value; });
-  row.append(h('td', { class: 'cell-title' }, titleInput));
-
-  const commentInput = h('textarea', { rows: 2, maxLength: 2000, value: draft.comment });
-  bindDraftInput(row, id, commentInput, () => { draft.comment = commentInput.value; });
-  row.append(h('td', { class: 'cell-comment' }, commentInput));
-
-  row.append(buildTagCell(row, id, draft));
-
-  const dateInput = h('input', { type: 'date', value: draft.publishedAt });
-  bindDraftInput(row, id, dateInput, () => { draft.publishedAt = dateInput.value; });
-  row.append(h('td', {}, dateInput));
-
-  const tenureOptions = [['', '不填'], ...(state.taxonomy?.tenures || []).map(item => [item.key, item.label])];
-  const tenureSelect = buildSelect(tenureOptions, draft.tenure);
-  bindDraftInput(row, id, tenureSelect, () => { draft.tenure = tenureSelect.value; }, 'change');
-  row.append(h('td', {}, tenureSelect));
-
-  row.append(h('td', { class: 'cell-narrow' }, `v${Number(data.revision) || 1}`));
-
-  row.append(h('td', { class: 'row-actions' },
-    h('button', { type: 'button', class: 'ghost small', onClick: () => revertReview(id) }, '还原'),
-    h('button', { type: 'button', class: 'danger small', onClick: () => deleteReview(id) }, '删除')));
-
-  row.classList.toggle('dirty', isReviewDirty(id));
+  row.append(
+    h('td', { class: 'cell-company' },
+      h('strong', {}, company?.data.name || '（公司缺失）'),
+      h('div', { class: 'cell-id' }, data.companyId || '—')),
+    h('td', { class: 'cell-project' }, reviewProjectName(entry), ' ', hiddenBadge(data)),
+    reviewCell,
+    h('td', { class: 'cell-narrow' }, `${Number(data.score) || '—'} 星`),
+    h('td', { class: 'cell-narrow' }, data.publishedAt || '—'),
+    h('td', { class: 'row-actions' },
+      h('button', {
+        type: 'button',
+        class: 'ghost small',
+        onClick: () => openReviewDialog(data.id),
+      }, '修改'),
+      h('button', {
+        type: 'button',
+        class: 'danger small',
+        onClick: () => deleteReview(data.id),
+      }, '删除'),
+      h('button', {
+        type: 'button',
+        class: 'ghost small',
+        onClick: () => toggleReviewHidden(data.id),
+      }, data.hidden ? '显示' : '隐藏')),
+  );
+  row.classList.toggle('is-hidden', Boolean(data.hidden));
   return row;
 }
 
@@ -434,188 +459,183 @@ function renderReviews() {
   const entries = visibleReviews();
   reviewRows.replaceChildren();
   if (!entries.length) {
-    reviewRows.append(h('tr', {}, h('td', { class: 'empty', colSpan: 11 }, '没有匹配的评价')));
+    reviewRows.append(h('tr', {}, h('td', { class: 'empty', colSpan: 6 }, '没有匹配的评价')));
   } else {
     entries.forEach(entry => reviewRows.append(buildReviewRow(entry)));
   }
   reviewCount.textContent = `显示 ${entries.length} / 共 ${state.reviews.size} 条`;
-  syncSelectAll();
-  updateReviewSaveButton();
-  renderBatchBar();
 }
 
-function visibleReviewIds() {
-  return visibleReviews().map(entry => entry.data.id);
+function openCompanyReviews(companyId) {
+  reviewCompanyFilter.value = companyId;
+  refreshReviewProjectFilter();
+  showView('reviews');
 }
 
-function syncSelectAll() {
-  const ids = visibleReviewIds();
-  const selected = ids.filter(id => state.selected.has(id)).length;
-  reviewSelectAll.checked = ids.length > 0 && selected === ids.length;
-  reviewSelectAll.indeterminate = selected > 0 && selected < ids.length;
+function openProjectReviews(companyId, projectId) {
+  reviewCompanyFilter.value = companyId;
+  refreshReviewProjectFilter();
+  reviewProjectFilter.value = projectId;
+  showView('reviews');
 }
 
-function renderBatchBar() {
-  const ids = [...state.selected].filter(id => state.reviews.has(id));
-  reviewBatch.hidden = ids.length === 0;
-  if (!ids.length) return;
-  batchSelected.textContent = `已选 ${ids.length} 条`;
+// ── 评价编辑弹窗 ──────────────────────────────────────────────────────────
 
-  const companyIds = new Set(ids.map(id => state.reviews.get(id)?.data.companyId));
-  const singleCompany = companyIds.size === 1 ? state.companies.get([...companyIds][0]) : null;
-  batchProject.disabled = !singleCompany;
-  const projectOptions = singleCompany
-    ? [
-      ['__keep', '不修改'],
-      ['__none', '不关联项目'],
-      ['__anon', '匿名项目'],
-      ...(singleCompany.data.projects || []).map(project => [project.id, project.name]),
-    ]
-    : [['__keep', '需选择同一公司的评价']];
-  batchProject.replaceChildren(...projectOptions.map(([value, label]) => h('option', { value }, label)));
-  batchProject.value = '__keep';
+function currentReviewEntry() {
+  return state.editingReviewId ? state.reviews.get(state.editingReviewId) || null : null;
 }
 
-function updateReviewSaveButton() {
-  const count = reviewDirtyIds().length;
-  reviewSaveButton.textContent = `保存修改（${count}）`;
-  reviewSaveButton.disabled = state.busy || count === 0;
+function renderReviewDialogOptions() {
+  reviewDialogTenure.replaceChildren(
+    h('option', { value: '' }, '不填'),
+    ...(state.taxonomy?.tenures || []).map(item => h('option', { value: item.key }, item.label)),
+  );
+  reviewDialogTags.replaceChildren(
+    ...(state.taxonomy?.tags || []).map(tag =>
+      h('label', {}, h('input', { type: 'checkbox', value: tag.key }), tag.label)),
+  );
 }
 
-function revertReview(id) {
+function fillReviewDialog() {
+  const entry = currentReviewEntry();
+  if (!entry) return;
+  const data = entry.data;
+  const company = state.companies.get(data.companyId);
+
+  reviewDialogMeta.textContent = `${data.id} · v${Number(data.revision) || 1}`;
+  reviewDialogCompany.value = company?.data.name || '（公司缺失）';
+
+  const selected = data.projectAnonymous ? '__anon' : (data.projectId || '__none');
+  const options = [['__none', '不关联项目'], ['__anon', '匿名项目']];
+  (company?.data.projects || []).forEach(project => options.push([project.id, project.name]));
+  if (!['__none', '__anon'].includes(selected)
+    && !(company?.data.projects || []).some(project => project.id === selected)) {
+    options.push([selected, `未知项目 ${selected}`]);
+  }
+  reviewDialogProject.replaceChildren(...options.map(([value, label]) => h('option', { value }, label)));
+  reviewDialogProject.value = selected;
+
+  reviewDialogScore.value = String(data.score || 3);
+  reviewDialogTitle.value = data.title || '';
+  reviewDialogComment.value = data.comment || '';
+  reviewDialogDate.value = data.publishedAt || '';
+  reviewDialogTenure.value = data.profile?.tenure || '';
+  reviewDialogTags.querySelectorAll('input').forEach(input => {
+    input.checked = (data.tags || []).includes(input.value);
+  });
+  setStatus(reviewDialogStatus, '');
+  refreshDialogSensitive();
+}
+
+function openReviewDialog(id) {
+  if (state.busy) return;
   const entry = state.reviews.get(id);
   if (!entry) return;
-  state.reviewDrafts.set(id, reviewSnapshot(entry.data));
-  renderReviews();
-  setStatus(globalStatus, `已还原 ${id} 的未保存修改`);
+  state.editingReviewId = id;
+  fillReviewDialog();
+  reviewDialog.showModal();
+  reviewDialogComment.focus();
 }
 
-function applyBatch() {
-  if (state.busy) return;
-  const ids = [...state.selected];
-  if (!ids.length) return;
-  const score = batchScore.value;
-  const project = batchProject.value;
-  const date = batchDate.value;
-  const tenure = batchTenure.value;
-  const tagsMode = batchTagsMode.value;
-  const pickedTags = [...batchTags.querySelectorAll('input:checked')].map(input => input.value);
-
-  ids.forEach(id => {
-    const draft = state.reviewDrafts.get(id);
-    if (!draft) return;
-    const next = { ...draft, tags: [...draft.tags] };
-    if (score) next.score = score;
-    if (project && project !== '__keep') next.project = project;
-    if (date) next.publishedAt = date;
-    if (tenure && tenure !== '__keep') next.tenure = tenure === '__clear' ? '' : tenure;
-    if (tagsMode === 'add') next.tags = [...new Set([...next.tags, ...pickedTags])].sort();
-    else if (tagsMode === 'replace') next.tags = [...new Set(pickedTags)].sort();
-    else if (tagsMode === 'clear') next.tags = [];
-    state.reviewDrafts.set(id, next);
-  });
-
-  renderReviews();
-  setStatus(globalStatus, `已将批量修改应用到 ${ids.length} 条评价（尚未保存）`);
+function collectReviewDialogFields() {
+  const choice = reviewDialogProject.value;
+  const projectAnonymous = choice === '__anon';
+  return {
+    score: Number(reviewDialogScore.value),
+    title: reviewDialogTitle.value.trim(),
+    comment: reviewDialogComment.value.trim(),
+    projectId: choice === '__none' || projectAnonymous ? '' : choice,
+    projectAnonymous,
+    tenure: reviewDialogTenure.value,
+    tags: [...reviewDialogTags.querySelectorAll('input:checked')].map(input => input.value),
+    publishedAt: reviewDialogDate.value,
+  };
 }
 
-async function saveReviews() {
+function reviewDialogChanged() {
+  const entry = currentReviewEntry();
+  if (!entry) return false;
+  return reviewContentChanged(entry.data, composeReview(entry.data, collectReviewDialogFields()));
+}
+
+function closeReviewDialog() {
+  if (reviewDialogChanged() && !window.confirm('评价有未保存的修改，确定放弃？')) return;
+  state.editingReviewId = null;
+  reviewDialog.close();
+}
+
+function refreshDialogSensitive() {
+  const result = scanDraft({ comment: reviewDialogComment.value, title: reviewDialogTitle.value });
+  const hard = result.hits.filter(hit => hit.level === 'hard');
+  const soft = result.hits.filter(hit => hit.level === 'soft');
+  const parts = [];
+  if (hard.length) {
+    parts.push(`禁止保存：${hard.map(hit => `${hit.field}有${hit.type}「${clip(hit.fragment, 20)}」`).join('、')}`);
+  }
+  if (soft.length) {
+    parts.push(`提醒：${soft.map(hit => `${hit.field}疑似${hit.type}「${clip(hit.fragment, 20)}」`).join('、')}`);
+  }
+  setStatus(reviewDialogSensitive, parts.join('；'));
+  reviewDialogSensitive.classList.toggle('blocked', hard.length > 0);
+  reviewDialogSensitive.classList.toggle('warn', !hard.length && soft.length > 0);
+}
+
+async function saveReviewDialog(event) {
+  event.preventDefault();
   if (state.busy) return;
-  const ids = reviewDirtyIds();
-  if (!ids.length) return;
+  const entry = currentReviewEntry();
+  if (!entry) return;
+  const company = state.companies.get(entry.data.companyId);
+  if (!company) {
+    setStatus(reviewDialogStatus, '所属公司不存在，无法保存', true);
+    return;
+  }
+
+  const fields = collectReviewDialogFields();
+  const profile = { ...(entry.data.profile || {}) };
+  if (fields.tenure) profile.tenure = fields.tenure;
+  else delete profile.tenure;
+
+  const errors = validateDraft({
+    companyId: entry.data.companyId,
+    projectId: fields.projectId,
+    projectAnonymous: fields.projectAnonymous,
+    score: fields.score,
+    title: fields.title,
+    comment: fields.comment,
+    profile,
+    tags: fields.tags,
+    publishedAt: fields.publishedAt,
+  }, { taxonomy: state.taxonomy, company: company.data });
+
+  if (scanDraft({ comment: fields.comment, title: fields.title }).hasHard) {
+    errors.push('正文或标题仍含手机号 / 邮箱 / 身份证号，请脱敏后再保存');
+  }
+  if (errors.length) {
+    setStatus(reviewDialogStatus, errors.join('；'), true);
+    return;
+  }
+
+  const next = composeReview(entry.data, fields);
+  if (!reviewContentChanged(entry.data, next)) {
+    setStatus(reviewDialogStatus, '没有改动');
+    return;
+  }
+
   setBusy(true);
-  let saved = 0;
-  const problems = [];
+  setStatus(reviewDialogStatus, '正在保存…');
   try {
-    for (let index = 0; index < ids.length; index += 1) {
-      const id = ids[index];
-      setStatus(globalStatus, `正在保存（${index + 1}/${ids.length}）：${id}…`);
-      const entry = state.reviews.get(id);
-      const draft = state.reviewDrafts.get(id);
-      const company = state.companies.get(entry.data.companyId);
-      if (!company) {
-        problems.push(`${id}：所属公司不存在`);
-        continue;
-      }
-
-      const projectAnonymous = draft.project === '__anon';
-      const projectId = draft.project === '__none' || projectAnonymous ? '' : draft.project;
-      const profile = { ...(entry.data.profile || {}) };
-      if (draft.tenure) profile.tenure = draft.tenure;
-      else delete profile.tenure;
-
-      const fields = {
-        score: Number(draft.score),
-        title: draft.title.trim(),
-        comment: draft.comment.trim(),
-        projectId,
-        projectAnonymous,
-        tenure: draft.tenure,
-        tags: [...draft.tags],
-        publishedAt: draft.publishedAt,
-      };
-
-      const errors = validateDraft({
-        companyId: entry.data.companyId,
-        projectId,
-        projectAnonymous,
-        score: fields.score,
-        title: fields.title,
-        comment: fields.comment,
-        profile,
-        tags: fields.tags,
-        publishedAt: fields.publishedAt,
-      }, { taxonomy: state.taxonomy, company: company.data });
-
-      if (scanDraft({ comment: fields.comment, title: fields.title }).hasHard) {
-        errors.push('正文或标题仍含手机号 / 邮箱 / 身份证号，请脱敏后再保存');
-      }
-      if (errors.length) {
-        problems.push(`${id}：${errors.join('、')}`);
-        continue;
-      }
-
-      const next = composeReview(entry.data, fields);
-      if (!reviewContentChanged(entry.data, next)) {
-        state.reviewDrafts.set(id, reviewSnapshot(entry.data));
-        continue;
-      }
-
-      try {
-        const file = await state.client.putFile(config.owner, config.publicRepo, entry.path, {
-          message: `data: edit ${id}`,
-          content: JSON.stringify(next, null, 2) + '\n',
-          sha: entry.sha,
-          branch: config.publicBranch,
-        });
-        entry.data = next;
-        entry.sha = file?.content?.sha || entry.sha;
-        state.reviewDrafts.set(id, reviewSnapshot(next));
-        saved += 1;
-        await logAudit('published_edit', {
-          targetType: 'review',
-          targetId: id,
-          reviewId: id,
-          companyId: entry.data.companyId,
-          note: '数据表维护评价',
-          commitSha: file?.commit?.sha || '',
-        });
-      } catch (error) {
-        if (error.status === 401) throw error;
-        problems.push(`${id}：${describeError(error)}`);
-      }
-    }
-
-    if (problems.length) {
-      const summary = problems.slice(0, 3).join('；');
-      const extra = problems.length > 3 ? ` 等 ${problems.length} 项` : '';
-      setStatus(globalStatus, `已保存 ${saved} 条；以下未保存：${summary}${extra}`, true);
-    } else {
-      setStatus(globalStatus, `已保存 ${saved} 条评价；展示站会自动重建（约 1–2 分钟）`);
-    }
+    await writeReviewFile(entry, next, `data: edit ${next.id}`, '数据表维护评价');
     renderReviews();
+    setStatus(globalStatus, `已保存 ${next.id}；展示站会自动重建（约 1–2 分钟）`);
+    state.editingReviewId = null;
+    reviewDialog.close();
   } catch (error) {
-    handleError(error);
+    if (error.status === 401) {
+      signOut('登录已失效，请重新登录。');
+      return;
+    }
+    setStatus(reviewDialogStatus, describeError(error), true);
   } finally {
     setBusy(false);
   }
@@ -634,9 +654,6 @@ async function deleteReview(id) {
       branch: config.publicBranch,
     });
     state.reviews.delete(id);
-    state.reviewDrafts.delete(id);
-    state.selected.delete(id);
-    setStatus(globalStatus, `已删除 ${id}；展示站会自动重建（约 1–2 分钟）`);
     await logAudit('published_delete', {
       targetType: 'review',
       targetId: id,
@@ -644,6 +661,25 @@ async function deleteReview(id) {
       companyId: entry.data.companyId,
       note: '删除评价',
     });
+    setStatus(globalStatus, `已删除 ${id}；展示站会自动重建（约 1–2 分钟）`);
+    renderAll();
+  } catch (error) {
+    handleError(error);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function toggleReviewHidden(id) {
+  if (state.busy) return;
+  const entry = state.reviews.get(id);
+  if (!entry) return;
+  const next = withHidden(entry.data);
+  setBusy(true);
+  try {
+    await writeReviewFile(entry, next, `data: ${next.hidden ? 'hide' : 'show'} ${id}`,
+      next.hidden ? '隐藏评价' : '取消隐藏评价');
+    setStatus(globalStatus, `${next.hidden ? '已隐藏' : '已恢复展示'} ${id}；展示站会自动重建（约 1–2 分钟）`);
     renderAll();
   } catch (error) {
     handleError(error);
@@ -654,68 +690,38 @@ async function deleteReview(id) {
 
 // ── 公司表 ────────────────────────────────────────────────────────────────
 
-function isCompanyDirty(id) {
-  const entry = state.companies.get(id);
-  const draft = state.companyDrafts.get(id);
-  if (!entry || !draft) return false;
-  const aliasesKey = list => parseAliases((list || []).join('，')).join('\u0000');
-  return (entry.data.name || '') !== draft.name
-    || (entry.data.slug || '') !== draft.slug
-    || aliasesKey(entry.data.aliases || []) !== aliasesKey(parseAliases(draft.aliases));
-}
-
-function dirtyCompanyIds() {
-  return [...state.companies.keys()].filter(id => isCompanyDirty(id));
-}
-
-function updateCompanySaveButton() {
-  const count = dirtyCompanyIds().length;
-  companySaveButton.textContent = `保存修改（${count}）`;
-  companySaveButton.disabled = state.busy || count === 0;
-}
-
 function buildCompanyRow(entry) {
-  const id = entry.data.id;
-  const draft = state.companyDrafts.get(id);
-  const row = h('tr', { dataset: { id } });
-  const mark = () => {
-    row.classList.toggle('dirty', isCompanyDirty(id));
-    updateCompanySaveButton();
-  };
-
-  const nameInput = h('input', { type: 'text', maxLength: 50, value: draft.name, autocomplete: 'off' });
-  nameInput.addEventListener('input', () => { draft.name = nameInput.value; mark(); });
-  const slugInput = h('input', { type: 'text', value: draft.slug, autocomplete: 'off', spellcheck: false });
-  slugInput.addEventListener('input', () => { draft.slug = slugInput.value; mark(); });
-  const aliasesInput = h('input', { type: 'text', value: draft.aliases, autocomplete: 'off' });
-  aliasesInput.addEventListener('input', () => { draft.aliases = aliasesInput.value; mark(); });
+  const data = entry.data;
+  const row = h('tr', { dataset: { id: data.id } });
+  const aliases = (data.aliases || []).join('、') || '—';
 
   row.append(
-    h('td', { class: 'cell-title' }, nameInput),
-    h('td', {}, h('code', { class: 'cell-id' }, id)),
-    h('td', {}, slugInput),
-    h('td', { class: 'cell-aliases' }, aliasesInput),
-    h('td', { class: 'cell-narrow' }, String((state.projectDrafts.get(id) || entry.data.projects || []).length)),
-    h('td', { class: 'cell-narrow' }, String(reviewCountForCompany(id))),
-    h('td', { class: 'nowrap' }, entry.data.updatedAt || '—'),
+    h('td', { class: 'cell-company' }, h('strong', {}, data.name || '—'), ' ', hiddenBadge(data)),
+    h('td', { class: 'cell-aliases' }, aliases),
+    h('td', { class: 'cell-narrow' }, String((data.projects || []).length)),
+    h('td', { class: 'cell-narrow' }, countButton(reviewCountForCompany(data.id), () => openCompanyReviews(data.id))),
+    h('td', { class: 'cell-narrow' }, data.updatedAt || '—'),
     h('td', { class: 'row-actions' },
       h('button', {
         type: 'button',
         class: 'ghost small',
-        onClick: () => { reviewCompanyFilter.value = id; showView('reviews'); },
-      }, '查看评价')),
+        onClick: () => openCompanyDialog(data.id),
+      }, '修改'),
+      h('button', {
+        type: 'button',
+        class: 'ghost small',
+        onClick: () => toggleCompanyHidden(data.id),
+      }, data.hidden ? '显示' : '隐藏')),
   );
-  row.classList.toggle('dirty', isCompanyDirty(id));
+  row.classList.toggle('is-hidden', Boolean(data.hidden));
   return row;
 }
 
 function renderCompanies() {
   updateTabCounts();
   const query = companySearch.value.trim().toLowerCase();
-  const dirtyOnly = companyDirtyOnly.checked;
   const entries = sortedCompanies().filter((entry) => {
     const data = entry.data;
-    if (dirtyOnly && !isCompanyDirty(data.id)) return false;
     if (!query) return true;
     const haystack = [data.name, data.id, data.slug, ...(data.aliases || [])].join(' ').toLowerCase();
     return haystack.includes(query);
@@ -723,88 +729,158 @@ function renderCompanies() {
 
   companyRows.replaceChildren();
   if (!entries.length) {
-    companyRows.append(h('tr', {}, h('td', { class: 'empty', colSpan: 8 }, '没有匹配的公司')));
+    companyRows.append(h('tr', {}, h('td', { class: 'empty', colSpan: 6 }, '没有匹配的公司')));
   } else {
     entries.forEach(entry => companyRows.append(buildCompanyRow(entry)));
   }
   companyCount.textContent = `显示 ${entries.length} / 共 ${state.companies.size} 家`;
-  updateCompanySaveButton();
 }
 
-async function saveCompanies() {
+function currentCompanyEntry() {
+  return state.editingCompanyId ? state.companies.get(state.editingCompanyId) || null : null;
+}
+
+function fillCompanyDialog() {
+  const entry = currentCompanyEntry();
+  if (!entry) return;
+  const data = entry.data;
+  const reviewCount = reviewCountForCompany(data.id);
+  companyDialogMeta.textContent = `${data.id} · ${(data.projects || []).length} 个项目 · ${reviewCount} 条评价`;
+  companyDialogName.value = data.name || '';
+  companyDialogSlug.value = data.slug || '';
+  companyDialogAliases.value = (data.aliases || []).join('，');
+
+  const blocked = (data.projects || []).length > 0 || reviewCount > 0;
+  companyDialogDelete.disabled = blocked;
+  setStatus(companyDialogDeleteHint, blocked
+    ? '公司下仍有项目或评价，全部清空后才能删除。'
+    : '公司下没有项目和评价，可以删除。');
+  setStatus(companyDialogStatus, '');
+}
+
+function openCompanyDialog(id) {
   if (state.busy) return;
-  const ids = dirtyCompanyIds();
-  if (!ids.length) return;
+  const entry = state.companies.get(id);
+  if (!entry) return;
+  state.editingCompanyId = id;
+  fillCompanyDialog();
+  companyDialog.showModal();
+  companyDialogName.focus();
+}
+
+function companyDialogChanged() {
+  const entry = currentCompanyEntry();
+  if (!entry) return false;
+  const data = entry.data;
+  const aliasesOf = list => parseAliases((list || []).join('，')).join('\u0000');
+  return (data.name || '') !== companyDialogName.value.trim()
+    || (data.slug || '') !== companyDialogSlug.value.trim()
+    || aliasesOf(data.aliases || []) !== aliasesOf(parseAliases(companyDialogAliases.value));
+}
+
+function closeCompanyDialog() {
+  if (companyDialogChanged() && !window.confirm('公司信息有未保存的修改，确定放弃？')) return;
+  state.editingCompanyId = null;
+  companyDialog.close();
+}
+
+async function saveCompanyDialog(event) {
+  event.preventDefault();
+  if (state.busy) return;
+  const entry = currentCompanyEntry();
+  if (!entry) return;
+
+  const next = composeCompany(entry.data, {
+    name: companyDialogName.value.trim(),
+    slug: companyDialogSlug.value.trim(),
+    aliases: parseAliases(companyDialogAliases.value),
+    projects: entry.data.projects || [],
+  });
+
+  const errors = validateCompany(next);
+  const slugTaken = [...state.companies.values()]
+    .some(other => other.data.id !== next.id && other.data.slug === next.slug);
+  if (slugTaken) errors.push(`slug「${next.slug}」已被其他公司使用`);
+  if (errors.length) {
+    setStatus(companyDialogStatus, errors.join('；'), true);
+    return;
+  }
+  if (!companyContentChanged(entry.data, next)) {
+    setStatus(companyDialogStatus, '没有改动');
+    return;
+  }
+
   setBusy(true);
-  let saved = 0;
-  const problems = [];
+  setStatus(companyDialogStatus, '正在保存…');
   try {
-    for (let index = 0; index < ids.length; index += 1) {
-      const id = ids[index];
-      setStatus(globalStatus, `正在保存（${index + 1}/${ids.length}）：${id}…`);
-      const entry = state.companies.get(id);
-      const draft = state.companyDrafts.get(id);
-
-      const next = composeCompany(entry.data, {
-        name: draft.name.trim(),
-        slug: draft.slug.trim(),
-        aliases: parseAliases(draft.aliases),
-        projects: entry.data.projects || [],
-      });
-
-      const errors = validateCompany(next);
-      const slugTaken = [...state.companies.values()]
-        .some(other => other.data.id !== id && other.data.slug === next.slug);
-      if (slugTaken) errors.push(`slug「${next.slug}」已被其他公司使用`);
-      if (errors.length) {
-        problems.push(`${id}：${errors.join('、')}`);
-        continue;
-      }
-      if (!companyContentChanged(entry.data, next)) {
-        state.companyDrafts.set(id, {
-          name: entry.data.name || '',
-          slug: entry.data.slug || '',
-          aliases: (entry.data.aliases || []).join('，'),
-        });
-        continue;
-      }
-
-      try {
-        const file = await state.client.putFile(config.owner, config.publicRepo, entry.path, {
-          message: `data: edit company ${id}`,
-          content: JSON.stringify(next, null, 2) + '\n',
-          sha: entry.sha,
-          branch: config.publicBranch,
-        });
-        entry.data = next;
-        entry.sha = file?.content?.sha || entry.sha;
-        state.companyDrafts.set(id, {
-          name: next.name,
-          slug: next.slug,
-          aliases: (next.aliases || []).join('，'),
-        });
-        saved += 1;
-        await logAudit('published_edit', {
-          targetType: 'company',
-          targetId: id,
-          companyId: id,
-          note: '数据表维护公司信息',
-          commitSha: file?.commit?.sha || '',
-        });
-      } catch (error) {
-        if (error.status === 401) throw error;
-        problems.push(`${id}：${describeError(error)}`);
-      }
+    await writeCompanyFile(entry, next, `data: edit company ${next.id}`, '数据表维护公司信息');
+    renderAll();
+    setStatus(globalStatus, `已保存 ${next.id}；展示站会自动重建（约 1–2 分钟）`);
+    state.editingCompanyId = null;
+    companyDialog.close();
+  } catch (error) {
+    if (error.status === 401) {
+      signOut('登录已失效，请重新登录。');
+      return;
     }
+    setStatus(companyDialogStatus, describeError(error), true);
+  } finally {
+    setBusy(false);
+  }
+}
 
-    if (problems.length) {
-      const summary = problems.slice(0, 3).join('；');
-      const extra = problems.length > 3 ? ` 等 ${problems.length} 项` : '';
-      setStatus(globalStatus, `已保存 ${saved} 家；以下未保存：${summary}${extra}`, true);
-    } else {
-      setStatus(globalStatus, `已保存 ${saved} 家公司信息；展示站会自动重建（约 1–2 分钟）`);
+async function deleteCompany() {
+  if (state.busy) return;
+  const entry = currentCompanyEntry();
+  if (!entry) return;
+  const data = entry.data;
+  const projectCount = (data.projects || []).length;
+  const reviews = reviewCountForCompany(data.id);
+  if (projectCount > 0 || reviews > 0) {
+    setStatus(companyDialogDeleteHint, '公司下仍有项目或评价，不能删除。', true);
+    return;
+  }
+  if (!window.confirm(`确认删除公司「${data.name}」？此操作不可撤销。`)) return;
+
+  setBusy(true);
+  try {
+    await state.client.deleteFile(config.owner, config.publicRepo, entry.path, {
+      message: `data: delete company ${data.id}`,
+      sha: entry.sha,
+      branch: config.publicBranch,
+    });
+    state.companies.delete(data.id);
+    await logAudit('published_delete', {
+      targetType: 'company',
+      targetId: data.id,
+      companyId: data.id,
+      note: '删除公司',
+    });
+    state.editingCompanyId = null;
+    companyDialog.close();
+    setStatus(globalStatus, `已删除公司 ${data.id}；展示站会自动重建（约 1–2 分钟）`);
+    renderAll();
+  } catch (error) {
+    if (error.status === 401) {
+      signOut('登录已失效，请重新登录。');
+      return;
     }
-    refreshCompanySelects();
+    setStatus(companyDialogStatus, describeError(error), true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function toggleCompanyHidden(id) {
+  if (state.busy) return;
+  const entry = state.companies.get(id);
+  if (!entry) return;
+  const next = withHidden(entry.data);
+  setBusy(true);
+  try {
+    await writeCompanyFile(entry, next, `data: ${next.hidden ? 'hide' : 'show'} company ${id}`,
+      next.hidden ? '隐藏公司' : '取消隐藏公司');
+    setStatus(globalStatus, `${next.hidden ? '已隐藏' : '已恢复展示'}公司 ${entry.data.name}；展示站会自动重建（约 1–2 分钟）`);
     renderAll();
   } catch (error) {
     handleError(error);
@@ -815,66 +891,50 @@ async function saveCompanies() {
 
 // ── 项目表 ────────────────────────────────────────────────────────────────
 
-function isProjectRowDirty(companyId, project) {
+function projectStatusLabel(status) {
+  return PROJECT_STATUS_LABEL[status] || status || '—';
+}
+
+function currentProjectContext() {
+  if (!state.editingProject) return null;
+  const { companyId, projectId } = state.editingProject;
   const entry = state.companies.get(companyId);
-  const original = (entry?.data.projects || []).find(item => item.id === project.id);
-  return !original || original.name !== project.name || original.status !== project.status;
+  if (!entry) return null;
+  const project = (entry.data.projects || []).find(item => item.id === projectId);
+  if (!project) return null;
+  return { entry, project };
 }
 
-function dirtyProjectCompanyIds() {
-  return [...state.projectDrafts.entries()]
-    .filter(([companyId, rows]) => {
-      const entry = state.companies.get(companyId);
-      if (!entry) return false;
-      return projectSnapshotKey(rows) !== projectSnapshotKey(projectSnapshot(entry.data.projects));
-    })
-    .map(([companyId]) => companyId);
-}
-
-function updateProjectSaveButton() {
-  const count = dirtyProjectCompanyIds().length;
-  projectSaveButton.textContent = `保存修改（${count} 家）`;
-  projectSaveButton.disabled = state.busy || count === 0;
-}
-
-function markProjectRow(row, companyId, project) {
-  row.classList.toggle('dirty', isProjectRowDirty(companyId, project));
-  updateProjectSaveButton();
-}
-
-function buildProjectRow(companyId, companyName, project) {
-  const row = h('tr', { dataset: { company: companyId, project: project.id } });
-  const nameInput = h('input', { type: 'text', maxLength: 50, value: project.name, autocomplete: 'off' });
-  nameInput.addEventListener('input', () => {
-    project.name = nameInput.value;
-    markProjectRow(row, companyId, project);
-  });
-  const statusSelect = buildSelect(PROJECT_STATUSES, project.status);
-  statusSelect.addEventListener('change', () => {
-    project.status = statusSelect.value;
-    markProjectRow(row, companyId, project);
-  });
-
-  const count = reviewCountForProject(companyId, project.id);
-  const removeButton = h('button', {
-    type: 'button',
-    class: 'danger small',
-    onClick: () => deleteProject(companyId, project.id),
-  }, '删除');
-  if (count > 0) {
-    removeButton.disabled = true;
-    removeButton.title = '该项目下已有展示评价，不能删除';
-  }
+function buildProjectRow(companyEntry, project) {
+  const data = companyEntry.data;
+  const row = h('tr', { dataset: { company: data.id, project: project.id } });
+  const aliases = (project.aliases || []).join('、') || '—';
+  const count = reviewCountForProject(data.id, project.id);
 
   row.append(
-    h('td', { class: 'cell-company' }, h('strong', {}, companyName)),
-    h('td', { class: 'cell-title' }, nameInput),
-    h('td', {}, h('code', { class: 'cell-id' }, project.id)),
-    h('td', {}, statusSelect),
-    h('td', { class: 'cell-narrow' }, String(count)),
-    h('td', { class: 'row-actions' }, removeButton),
+    h('td', { class: 'cell-title' }, h('strong', {}, project.name), ' ', hiddenBadge(project)),
+    h('td', { class: 'cell-aliases' }, aliases),
+    h('td', { class: 'cell-company' }, data.name),
+    h('td', { class: 'cell-narrow' }, projectStatusLabel(project.status)),
+    h('td', { class: 'cell-narrow' }, countButton(count, () => openProjectReviews(data.id, project.id))),
+    h('td', { class: 'row-actions' },
+      h('button', {
+        type: 'button',
+        class: 'ghost small',
+        onClick: () => openProjectDialog(data.id, project.id),
+      }, '修改'),
+      h('button', {
+        type: 'button',
+        class: 'danger small',
+        onClick: () => deleteProject(data.id, project.id),
+      }, '删除'),
+      h('button', {
+        type: 'button',
+        class: 'ghost small',
+        onClick: () => toggleProjectHidden(data.id, project.id),
+      }, project.hidden ? '显示' : '隐藏')),
   );
-  row.classList.toggle('dirty', isProjectRowDirty(companyId, project));
+  row.classList.toggle('is-hidden', Boolean(project.hidden));
   return row;
 }
 
@@ -883,30 +943,175 @@ function renderProjects() {
   const query = projectSearch.value.trim().toLowerCase();
   const companyId = projectCompanyFilter.value;
   const rows = [];
-  state.projectDrafts.forEach((projects, ownerId) => {
-    const entry = state.companies.get(ownerId);
-    if (!entry) return;
-    if (companyId && ownerId !== companyId) return;
-    projects.forEach(project => {
-      const haystack = [entry.data.name, entry.data.id, project.name, project.id].join(' ').toLowerCase();
+  sortedCompanies().forEach(entry => {
+    if (companyId && entry.data.id !== companyId) return;
+    (entry.data.projects || []).forEach(project => {
+      const haystack = [
+        entry.data.name,
+        entry.data.id,
+        project.name,
+        project.id,
+        ...(project.aliases || []),
+      ].join(' ').toLowerCase();
       if (query && !haystack.includes(query)) return;
-      rows.push({ ownerId, companyName: entry.data.name, project });
+      rows.push({ entry, project });
     });
   });
-  rows.sort((a, b) => a.companyName.localeCompare(b.companyName, 'zh-CN')
-    || a.project.name.localeCompare(b.project.name, 'zh-CN'));
 
   projectRows.replaceChildren();
   if (!rows.length) {
     projectRows.append(h('tr', {}, h('td', { class: 'empty', colSpan: 6 }, '没有匹配的项目')));
   } else {
-    rows.forEach(row => projectRows.append(buildProjectRow(row.ownerId, row.companyName, row.project)));
+    rows.forEach(({ entry, project }) => projectRows.append(buildProjectRow(entry, project)));
   }
   let total = 0;
-  state.projectDrafts.forEach(projects => { total += projects.length; });
+  state.companies.forEach(entry => { total += (entry.data.projects || []).length; });
   projectCount.textContent = `显示 ${rows.length} / 共 ${total} 个项目`;
-  updateProjectSaveButton();
 }
+
+function fillProjectDialog() {
+  const context = currentProjectContext();
+  if (!context) return;
+  const { entry, project } = context;
+  const count = reviewCountForProject(entry.data.id, project.id);
+  projectDialogMeta.textContent = `${project.id} · ${count} 条评价`;
+  projectDialogCompany.value = entry.data.name;
+  projectDialogName.value = project.name || '';
+  projectDialogStatusSelect.value = project.status || 'unknown';
+  projectDialogAliases.value = (project.aliases || []).join('，');
+  setStatus(projectDialogMessage, '');
+}
+
+function openProjectDialog(companyId, projectId) {
+  if (state.busy) return;
+  const entry = state.companies.get(companyId);
+  if (!entry) return;
+  if (!(entry.data.projects || []).some(project => project.id === projectId)) return;
+  state.editingProject = { companyId, projectId };
+  fillProjectDialog();
+  projectDialog.showModal();
+  projectDialogName.focus();
+}
+
+function projectDialogChanged() {
+  const context = currentProjectContext();
+  if (!context) return false;
+  const { project } = context;
+  const aliasesOf = list => parseAliases((list || []).join('，')).join('\u0000');
+  return (project.name || '') !== projectDialogName.value.trim()
+    || (project.status || 'unknown') !== projectDialogStatusSelect.value
+    || aliasesOf(project.aliases || []) !== aliasesOf(parseAliases(projectDialogAliases.value));
+}
+
+function closeProjectDialog() {
+  if (projectDialogChanged() && !window.confirm('项目信息有未保存的修改，确定放弃？')) return;
+  state.editingProject = null;
+  projectDialog.close();
+}
+
+function applyProjectChange(entry, projectId, updater) {
+  const projects = (entry.data.projects || [])
+    .map(project => (project.id === projectId ? updater(project) : project))
+    .filter(Boolean);
+  return composeCompany(entry.data, {
+    name: entry.data.name,
+    slug: entry.data.slug,
+    aliases: entry.data.aliases || [],
+    projects,
+  });
+}
+
+async function saveProjectDialog(event) {
+  event.preventDefault();
+  if (state.busy) return;
+  const context = currentProjectContext();
+  if (!context) return;
+  const { entry, project } = context;
+
+  const nextProject = composeProject(project, {
+    name: projectDialogName.value.trim(),
+    aliases: parseAliases(projectDialogAliases.value),
+    status: projectDialogStatusSelect.value,
+  });
+  const next = applyProjectChange(entry, project.id, () => nextProject);
+
+  const errors = validateCompany(next);
+  if (errors.length) {
+    setStatus(projectDialogMessage, errors.join('；'), true);
+    return;
+  }
+  if (!companyContentChanged(entry.data, next)) {
+    setStatus(projectDialogMessage, '没有改动');
+    return;
+  }
+
+  setBusy(true);
+  setStatus(projectDialogMessage, '正在保存…');
+  try {
+    await writeCompanyFile(entry, next, `data: edit project ${project.id}`, '数据表维护项目信息');
+    renderAll();
+    setStatus(globalStatus, `已保存项目「${nextProject.name}」；展示站会自动重建（约 1–2 分钟）`);
+    state.editingProject = null;
+    projectDialog.close();
+  } catch (error) {
+    if (error.status === 401) {
+      signOut('登录已失效，请重新登录。');
+      return;
+    }
+    setStatus(projectDialogMessage, describeError(error), true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function deleteProject(companyId, projectId) {
+  if (state.busy) return;
+  const entry = state.companies.get(companyId);
+  if (!entry) return;
+  const project = (entry.data.projects || []).find(item => item.id === projectId);
+  if (!project) return;
+  const count = reviewCountForProject(companyId, projectId);
+  if (count > 0) {
+    setStatus(globalStatus, '该项目下已有展示评价，不能删除', true);
+    return;
+  }
+  if (!window.confirm(`确认删除项目「${project.name}」？此操作不可撤销。`)) return;
+
+  const next = applyProjectChange(entry, projectId, () => null);
+  setBusy(true);
+  try {
+    await writeCompanyFile(entry, next, `data: delete project ${projectId}`, '删除项目');
+    setStatus(globalStatus, `已删除项目「${project.name}」；展示站会自动重建（约 1–2 分钟）`);
+    renderAll();
+  } catch (error) {
+    handleError(error);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function toggleProjectHidden(companyId, projectId) {
+  if (state.busy) return;
+  const entry = state.companies.get(companyId);
+  if (!entry) return;
+  const project = (entry.data.projects || []).find(item => item.id === projectId);
+  if (!project) return;
+  const nextProject = withHidden(project);
+  const next = applyProjectChange(entry, projectId, () => nextProject);
+  setBusy(true);
+  try {
+    await writeCompanyFile(entry, next, `data: ${nextProject.hidden ? 'hide' : 'show'} project ${projectId}`,
+      nextProject.hidden ? '隐藏项目' : '取消隐藏项目');
+    setStatus(globalStatus, `${nextProject.hidden ? '已隐藏' : '已恢复展示'}项目「${project.name}」；展示站会自动重建（约 1–2 分钟）`);
+    renderAll();
+  } catch (error) {
+    handleError(error);
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ── 新增项目 ──────────────────────────────────────────────────────────────
 
 function openNewProjectForm() {
   projectNewForm.hidden = false;
@@ -917,7 +1122,7 @@ function openNewProjectForm() {
   newProjectName.focus();
 }
 
-function addProject() {
+async function addProject() {
   if (state.busy) return;
   const companyId = newProjectCompany.value;
   const name = newProjectName.value.trim();
@@ -929,107 +1134,30 @@ function addProject() {
     setStatus(globalStatus, '项目名不能为空且不超过 50 字', true);
     return;
   }
-  const projects = state.projectDrafts.get(companyId) || [];
-  const id = newProjectId(name, new Set(projects.map(project => project.id)));
-  projects.push({ id, name, status: newProjectStatus.value });
-  state.projectDrafts.set(companyId, projects);
-  projectNewForm.hidden = true;
-  renderProjects();
-  setStatus(globalStatus, `已添加项目「${name}」（尚未保存）`);
-}
+  const entry = state.companies.get(companyId);
+  if (!entry) return;
 
-function deleteProject(companyId, projectId) {
-  if (state.busy) return;
-  const count = reviewCountForProject(companyId, projectId);
-  if (count > 0) {
-    setStatus(globalStatus, '该项目下已有展示评价，不能删除', true);
+  const existingIds = new Set((entry.data.projects || []).map(project => project.id));
+  const id = newProjectId(name, existingIds);
+  const project = { id, name, status: newProjectStatus.value };
+  const next = composeCompany(entry.data, {
+    name: entry.data.name,
+    slug: entry.data.slug,
+    aliases: entry.data.aliases || [],
+    projects: [...(entry.data.projects || []), project],
+  });
+
+  const errors = validateCompany(next);
+  if (errors.length) {
+    setStatus(globalStatus, errors.join('；'), true);
     return;
   }
-  const projects = state.projectDrafts.get(companyId) || [];
-  const target = projects.find(project => project.id === projectId);
-  if (!target) return;
-  if (!window.confirm(`确认移除项目「${target.name}」？保存后生效。`)) return;
-  state.projectDrafts.set(companyId, projects.filter(project => project.id !== projectId));
-  renderProjects();
-  setStatus(globalStatus, `已移除项目「${target.name}」（尚未保存）`);
-}
 
-async function saveProjects() {
-  if (state.busy) return;
-  const ids = dirtyProjectCompanyIds();
-  if (!ids.length) return;
   setBusy(true);
-  let saved = 0;
-  const problems = [];
   try {
-    for (let index = 0; index < ids.length; index += 1) {
-      const companyId = ids[index];
-      setStatus(globalStatus, `正在保存（${index + 1}/${ids.length}）：${companyId}…`);
-      const entry = state.companies.get(companyId);
-      const rows = state.projectDrafts.get(companyId) || [];
-      const projects = composeProjects(entry.data.projects || [], rows);
-
-      const next = composeCompany(entry.data, {
-        name: entry.data.name,
-        slug: entry.data.slug,
-        aliases: entry.data.aliases || [],
-        projects,
-      });
-
-      const errors = validateCompany(next);
-      const seen = new Set();
-      next.projects.forEach(project => {
-        if (seen.has(project.id)) errors.push(`项目 ID 重复：${project.id}`);
-        seen.add(project.id);
-      });
-      const referenced = referencedProjectIds([...state.reviews.values()]
-        .filter(review => review.data.companyId === companyId)
-        .map(review => review.data));
-      (entry.data.projects || []).forEach(project => {
-        if (!projects.some(item => item.id === project.id) && referenced.has(project.id)) {
-          errors.push(`项目「${project.name}」下已有展示评价，不能删除`);
-        }
-      });
-      if (errors.length) {
-        problems.push(`${companyId}：${errors.join('、')}`);
-        continue;
-      }
-      if (!companyContentChanged(entry.data, next)) {
-        state.projectDrafts.set(companyId, projectSnapshot(entry.data.projects));
-        continue;
-      }
-
-      try {
-        const file = await state.client.putFile(config.owner, config.publicRepo, entry.path, {
-          message: `data: edit company ${companyId}`,
-          content: JSON.stringify(next, null, 2) + '\n',
-          sha: entry.sha,
-          branch: config.publicBranch,
-        });
-        entry.data = next;
-        entry.sha = file?.content?.sha || entry.sha;
-        state.projectDrafts.set(companyId, projectSnapshot(next.projects));
-        saved += 1;
-        await logAudit('published_edit', {
-          targetType: 'company',
-          targetId: companyId,
-          companyId,
-          note: '数据表维护项目列表',
-          commitSha: file?.commit?.sha || '',
-        });
-      } catch (error) {
-        if (error.status === 401) throw error;
-        problems.push(`${companyId}：${describeError(error)}`);
-      }
-    }
-
-    if (problems.length) {
-      const summary = problems.slice(0, 3).join('；');
-      const extra = problems.length > 3 ? ` 等 ${problems.length} 项` : '';
-      setStatus(globalStatus, `已保存 ${saved} 家；以下未保存：${summary}${extra}`, true);
-    } else {
-      setStatus(globalStatus, `已保存 ${saved} 家公司的项目信息；展示站会自动重建（约 1–2 分钟）`);
-    }
+    await writeCompanyFile(entry, next, `data: add project ${id}`, '新增项目');
+    projectNewForm.hidden = true;
+    setStatus(globalStatus, `已添加项目「${name}」；展示站会自动重建（约 1–2 分钟）`);
     renderAll();
   } catch (error) {
     handleError(error);
@@ -1084,29 +1212,12 @@ async function loadData() {
   });
   state.reviews = new Map(reviewFiles.filter(Boolean).map(entry => [entry.data.id, entry]));
 
-  state.reviewDrafts = new Map([...state.reviews].map(([id, entry]) => [id, reviewSnapshot(entry.data)]));
-  state.companyDrafts = new Map([...state.companies].map(([id, entry]) => [id, {
-    name: entry.data.name || '',
-    slug: entry.data.slug || '',
-    aliases: (entry.data.aliases || []).join('，'),
-  }]));
-  state.projectDrafts = new Map([...state.companies].map(([id, entry]) => [id, projectSnapshot(entry.data.projects)]));
-  state.selected.clear();
+  state.editingReviewId = null;
+  state.editingCompanyId = null;
+  state.editingProject = null;
 
-  renderBatchTags();
-}
-
-function renderBatchTags() {
-  batchTags.replaceChildren(...(state.taxonomy?.tags || []).map(tag =>
-    h('label', {}, h('input', { type: 'checkbox', value: tag.key }), tag.label)));
-  batchTagsMode.value = '__keep';
-  batchTags.hidden = true;
-  batchTenure.replaceChildren(
-    h('option', { value: '__keep' }, '不修改'),
-    h('option', { value: '__clear' }, '清空'),
-    ...(state.taxonomy?.tenures || []).map(tag => h('option', { value: tag.key }, tag.label)),
-  );
-  batchTenure.value = '__keep';
+  renderReviewDialogOptions();
+  refreshReviewProjectFilter();
 }
 
 // ── 登录 ──────────────────────────────────────────────────────────────────
@@ -1168,10 +1279,9 @@ function signOut(message = '') {
   state.taxonomy = null;
   state.companies = new Map();
   state.reviews = new Map();
-  state.reviewDrafts = new Map();
-  state.companyDrafts = new Map();
-  state.projectDrafts = new Map();
-  state.selected.clear();
+  state.editingReviewId = null;
+  state.editingCompanyId = null;
+  state.editingProject = null;
   state.busy = false;
   userLabel.textContent = '';
   reviewRows.replaceChildren();
@@ -1180,7 +1290,10 @@ function signOut(message = '') {
   reviewCount.textContent = '';
   companyCount.textContent = '';
   projectCount.textContent = '';
-  reviewBatch.hidden = true;
+  [reviewDialog, companyDialog, projectDialog].forEach(dialog => {
+    if (dialog.open) dialog.close();
+  });
+  [reviewDialogForm, companyDialogForm, projectDialogForm].forEach(form => { form.inert = false; });
   projectNewForm.hidden = true;
   showLogin(message);
   setStatus(globalStatus, '');
@@ -1193,6 +1306,7 @@ async function refreshData() {
   try {
     await loadData();
     refreshCompanySelects();
+    refreshReviewProjectFilter();
     renderAll();
     setStatus(globalStatus, `已刷新：${state.companies.size} 家公司、${state.reviews.size} 条评价`);
   } catch (error) {
@@ -1226,36 +1340,16 @@ bootLogin.addEventListener('click', () => {
 
 tabs.forEach(tab => tab.addEventListener('click', () => showView(tab.dataset.view)));
 
-const resetReviewView = () => {
-  state.selected.clear();
+reviewSearch.addEventListener('input', renderReviews);
+reviewCompanyFilter.addEventListener('change', () => {
+  refreshReviewProjectFilter();
   renderReviews();
-};
-reviewSearch.addEventListener('input', resetReviewView);
-reviewCompanyFilter.addEventListener('change', resetReviewView);
-reviewScoreFilter.addEventListener('change', resetReviewView);
-reviewDirtyOnly.addEventListener('change', resetReviewView);
-reviewSaveButton.addEventListener('click', saveReviews);
+});
+reviewProjectFilter.addEventListener('change', renderReviews);
+reviewScoreFilter.addEventListener('change', renderReviews);
 reviewRefresh.addEventListener('click', refreshData);
 
-reviewSelectAll.addEventListener('change', () => {
-  const ids = visibleReviewIds();
-  if (reviewSelectAll.checked) ids.forEach(id => state.selected.add(id));
-  else ids.forEach(id => state.selected.delete(id));
-  renderReviews();
-});
-
-batchTagsMode.addEventListener('change', () => {
-  batchTags.hidden = !['add', 'replace'].includes(batchTagsMode.value);
-});
-batchApply.addEventListener('click', applyBatch);
-batchClear.addEventListener('click', () => {
-  state.selected.clear();
-  renderReviews();
-});
-
 companySearch.addEventListener('input', renderCompanies);
-companyDirtyOnly.addEventListener('change', renderCompanies);
-companySaveButton.addEventListener('click', saveCompanies);
 companyRefresh.addEventListener('click', refreshData);
 
 projectSearch.addEventListener('input', renderProjects);
@@ -1264,7 +1358,6 @@ projectNewButton.addEventListener('click', () => {
   if (projectNewForm.hidden) openNewProjectForm();
   else projectNewForm.hidden = true;
 });
-projectSaveButton.addEventListener('click', saveProjects);
 projectRefresh.addEventListener('click', refreshData);
 newProjectAdd.addEventListener('click', addProject);
 newProjectCancel.addEventListener('click', () => { projectNewForm.hidden = true; });
@@ -1273,6 +1366,37 @@ newProjectName.addEventListener('keydown', event => {
     event.preventDefault();
     addProject();
   }
+});
+
+reviewDialogForm.addEventListener('submit', saveReviewDialog);
+reviewDialogCancel.addEventListener('click', closeReviewDialog);
+reviewDialogClose.addEventListener('click', closeReviewDialog);
+reviewDialogRevert.addEventListener('click', () => {
+  fillReviewDialog();
+  setStatus(reviewDialogStatus, '已还原为已保存内容');
+});
+reviewDialogComment.addEventListener('input', refreshDialogSensitive);
+reviewDialogTitle.addEventListener('input', refreshDialogSensitive);
+reviewDialog.addEventListener('cancel', event => {
+  event.preventDefault();
+  closeReviewDialog();
+});
+
+companyDialogForm.addEventListener('submit', saveCompanyDialog);
+companyDialogCancel.addEventListener('click', closeCompanyDialog);
+companyDialogClose.addEventListener('click', closeCompanyDialog);
+companyDialogDelete.addEventListener('click', deleteCompany);
+companyDialog.addEventListener('cancel', event => {
+  event.preventDefault();
+  closeCompanyDialog();
+});
+
+projectDialogForm.addEventListener('submit', saveProjectDialog);
+projectDialogCancel.addEventListener('click', closeProjectDialog);
+projectDialogClose.addEventListener('click', closeProjectDialog);
+projectDialog.addEventListener('cancel', event => {
+  event.preventDefault();
+  closeProjectDialog();
 });
 
 window.addEventListener('beforeunload', event => {

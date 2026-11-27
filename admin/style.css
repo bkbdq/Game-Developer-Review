@@ -405,51 +405,59 @@ button.small { padding: .3rem .65rem; font-size: .82rem; }
 .data-table select,
 .data-table textarea { padding: .35rem .45rem; font-size: .88rem; }
 .data-table textarea { min-height: 2.6rem; resize: vertical; }
-.data-table .cell-select { width: 2rem; }
-.data-table .cell-select input { width: auto; margin-top: .45rem; }
 .data-table .cell-narrow { white-space: nowrap; }
 .data-table .cell-id { color: var(--muted); font-size: .78rem; font-weight: 400; }
 .data-table .cell-company { min-width: 7rem; }
 .data-table .cell-title { min-width: 9rem; }
 .data-table .cell-aliases { min-width: 12rem; }
-.data-table .cell-comment { min-width: 18rem; }
-.data-table .cell-comment textarea { min-width: 18rem; }
-.data-table .cell-tags { min-width: 8rem; }
+.data-table .cell-project { min-width: 8rem; white-space: nowrap; }
+.data-table .cell-review { min-width: 24rem; }
+.data-table .cell-review strong { font-weight: 600; }
+.data-table .review-text { color: var(--muted); font-size: .86rem; margin-top: .2rem; }
 .data-table td.empty { padding: 2rem 0; text-align: center; color: var(--muted); }
-.data-table tr.dirty td { background: #fdf6e3; }
+.data-table tr.is-hidden td { opacity: .5; }
 .data-table .row-actions { white-space: nowrap; }
 .data-table .row-actions button + button { margin-left: .35rem; }
-.tag-picker summary { cursor: pointer; color: var(--muted); font-size: .82rem; white-space: nowrap; }
-.tag-picker[open] summary { margin-bottom: .35rem; }
-.tag-checks { flex-direction: column; gap: .25rem; font-size: .82rem; }
-.tag-checks label { font-weight: 400; }
-.tag-checks input { width: auto; }
-.batch-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .6rem;
-  align-items: flex-end;
-  padding: .75rem .9rem;
-  margin-bottom: .75rem;
-  border: 1px solid var(--accent);
-  border-radius: 10px;
-  background: #eef7f1;
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
-.batch-bar strong { align-self: center; color: var(--accent); }
-.batch-field { display: flex; flex-direction: column; gap: .2rem; font-size: .78rem; color: var(--muted); font-weight: 600; }
-.batch-field input,
-.batch-field select { min-width: 8rem; font-weight: 400; }
-.batch-tags { align-self: center; }
-.batch-bar button { align-self: flex-end; }
+.hidden-badge { color: var(--warn); border-color: currentColor; }
 .new-project-form { margin-bottom: .9rem; }
 .is-busy .data-panel { opacity: .6; cursor: progress; }
+
+/* 评价编辑弹窗 */
+.modal {
+  width: min(52rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: 1.25rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+}
+.modal::backdrop { background: rgba(0, 0, 0, .45); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .35rem; }
+.modal-head h2 { margin: 0; font-size: 1.2rem; }
+.modal form > label { display: block; margin-bottom: .9rem; font-size: .88rem; color: var(--muted); }
+.modal form > label input,
+.modal form > label select,
+.modal form > label textarea,
+.modal .grid label input,
+.modal .grid label select { margin-top: .3rem; font-weight: 400; color: var(--ink); }
+.modal .grid { margin-bottom: .9rem; }
 
 @media (max-width: 780px) {
   .data-toolbar input[type="search"],
   .data-toolbar select { max-width: none; }
 }
 
-@media (prefers-color-scheme: dark) {
-  .data-table tr.dirty td { background: #33301f; }
-  .batch-bar { background: #233a2e; }
-}
+

@@ -106,54 +106,10 @@ export function newProjectId(name, existingIds = new Set()) {
   return `${base}-${index}`;
 }
 
-// ── 数据表维护：编辑草稿快照 ─────────────────────────────────────────────
-
-/** 把已展示评价转成表格编辑用的扁平字段。 */
-export function reviewSnapshot(data) {
-  return {
-    score: String(Number(data.score) || 0),
-    title: data.title || '',
-    comment: data.comment || '',
-    project: data.projectAnonymous ? '__anon' : (data.projectId || '__none'),
-    publishedAt: data.publishedAt || '',
-    tenure: data.profile?.tenure || '',
-    tags: [...(data.tags || [])].sort(),
-  };
-}
-
-/** 比较表格草稿与已保存数据是否不同（忽略 revision 与标签顺序）。 */
-export function reviewSnapshotChanged(data, snapshot) {
-  if (!snapshot) return false;
-  const base = reviewSnapshot(data);
-  return base.score !== String(snapshot.score)
-    || base.title !== snapshot.title
-    || base.comment !== snapshot.comment
-    || base.project !== snapshot.project
-    || base.publishedAt !== snapshot.publishedAt
-    || base.tenure !== snapshot.tenure
-    || base.tags.join('\u0000') !== [...(snapshot.tags || [])].sort().join('\u0000');
-}
-
-/** 项目的可编辑字段快照，用于表格批量维护。 */
-export function projectSnapshot(projects) {
-  return (projects || []).map(project => ({
-    id: project.id || '',
-    name: project.name || '',
-    status: project.status || 'unknown',
-  }));
-}
-
-/** 用固定分隔符拼接项目行，便于比较是否有改动。 */
-export function projectSnapshotKey(rows) {
-  return (rows || [])
-    .map(row => `${row.id}\u0000${row.name}\u0000${row.status}`)
-    .join('\n');
-}
-
-/** 合并项目编辑结果：保留原有扩展字段，只覆盖 id / name / status。 */
-export function composeProjects(originalProjects, rows) {
-  return (rows || []).map(row => {
-    const base = (originalProjects || []).find(project => project.id === row.id) || {};
-    return { ...clone(base), id: row.id, name: row.name, status: row.status };
-  });
+/** 生成项目的新内容；保留 genre / featuredReviewId / hidden 等其余字段。 */
+export function composeProject(original, { name, aliases = [], status }) {
+  const next = { ...clone(original), name, status };
+  if (aliases.length) next.aliases = [...aliases];
+  else delete next.aliases;
+  return next;
 }

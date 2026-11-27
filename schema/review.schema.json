@@ -26,6 +26,7 @@
     },
     "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "publishedAt": { "type": "string", "format": "date" },
-    "revision": { "type": "integer", "minimum": 1 }
+    "revision": { "type": "integer", "minimum": 1 },
+    "hidden": { "type": "boolean" }
   }
 }

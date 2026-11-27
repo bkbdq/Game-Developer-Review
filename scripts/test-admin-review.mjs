@@ -18,6 +18,11 @@ import {
   composeCompany,
   companyContentChanged,
   newProjectId,
+  reviewSnapshot,
+  reviewSnapshotChanged,
+  projectSnapshot,
+  projectSnapshotKey,
+  composeProjects,
 } from '../admin/lib/published.js';
 import { getSession, setSession, clearSession } from '../admin/lib/session.js';
 
@@ -188,6 +193,30 @@ check('公司内容变化可识别', companyContentChanged(companyOriginal, comp
 const generatedId = newProjectId('测试项目', new Set());
 check('新项目 ID 以 p_ 开头', generatedId.startsWith('p_'), true);
 check('项目 ID 冲突追加序号', newProjectId('测试项目', new Set([generatedId])), `${generatedId}-2`);
+
+// ── 数据表维护快照 ───────────────────────────────────────────────────────
+const reviewSnapshotValue = reviewSnapshot(publishedOriginal);
+check('快照评分字符串', reviewSnapshotValue.score, '3');
+check('快照关联项目', reviewSnapshotValue.project, 'p_x');
+check('快照标签副本', JSON.stringify(reviewSnapshotValue.tags), JSON.stringify(['overtime']));
+check('快照未改动', reviewSnapshotChanged(publishedOriginal, reviewSnapshotValue), false);
+check('快照标签顺序不影响', reviewSnapshotChanged(
+  { ...publishedOriginal, tags: ['overtime', 'welfare'] },
+  { ...reviewSnapshotValue, tags: ['welfare', 'overtime'] },
+), false);
+check('快照改动正文', reviewSnapshotChanged(publishedOriginal, { ...reviewSnapshotValue, comment: '新正文' }), true);
+check('快照匿名项目', reviewSnapshot({ ...publishedOriginal, projectAnonymous: true, projectId: undefined }).project, '__anon');
+check('快照未关联项目', reviewSnapshot({ ...publishedOriginal, projectId: undefined }).project, '__none');
+
+const projectRows = projectSnapshot(companyOriginal.projects);
+check('项目快照字段', JSON.stringify(projectRows), JSON.stringify([{ id: 'p_x', name: '项目', status: 'live' }]));
+check('项目快照可比较', projectSnapshotKey(projectRows), 'p_x\u0000项目\u0000live');
+const mergedProjects = composeProjects(companyOriginal.projects, [
+  { id: 'p_x', name: '项目改名', status: 'dev' },
+  { id: 'p_y', name: '新项目', status: 'unknown' },
+]);
+check('项目合并保留扩展字段', mergedProjects[0].genre, 'rpg');
+check('项目合并覆盖名称状态', [mergedProjects[0].name, mergedProjects[0].status], ['项目改名', 'dev']);
 
 // ── 登录会话缓存 ─────────────────────────────────────────────────────────
 const sessionStore = new Map();

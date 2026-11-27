@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'self'">
+  <title>数据维护 · 审核控制台</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a class="topbar-link" href="/">← 审核台</a>
+      <strong>数据维护</strong>
+      <span id="user-label"></span>
+    </div>
+    <div class="topbar-actions">
+      <a class="topbar-link" href="/requests.html">申请 / 联系</a>
+      <a class="topbar-link" href="/audit.html">审计日志</a>
+      <button id="logout-button" type="button" class="ghost" hidden>退出</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="boot-view" class="panel login boot" aria-live="polite">
+      <h1><span class="boot-spinner" aria-hidden="true"></span>正在进入数据维护…</h1>
+      <p>正在确认登录状态，通常无需重新输入 token。</p>
+      <p id="boot-status" class="status" role="status">正在验证登录状态…</p>
+      <div id="boot-actions" class="actions" hidden>
+        <button id="boot-retry" type="button">重试</button>
+        <button id="boot-login" type="button" class="ghost">重新登录</button>
+      </div>
+    </section>
+
+    <section id="login-view" class="panel login" hidden>
+      <h1>管理员登录</h1>
+      <p>使用与审核台相同的 GitHub PAT。登录后 30 天内免登录。</p>
+      <form id="login-form">
+        <label for="token">GitHub Token</label>
+        <input id="token" type="password" autocomplete="off" spellcheck="false" required>
+        <button type="submit">登录</button>
+      </form>
+      <p id="login-status" class="status" role="status"></p>
+    </section>
+
+    <section id="app-view" hidden>
+      <div class="data-tabs" role="tablist" aria-label="数据维护分类">
+        <button type="button" class="tab active" data-view="reviews">评价（<span id="tab-review-count">0</span>）</button>
+        <button type="button" class="tab" data-view="companies">公司（<span id="tab-company-count">0</span>）</button>
+        <button type="button" class="tab" data-view="projects">项目（<span id="tab-project-count">0</span>）</button>
+      </div>
+
+      <!-- 评价 -->
+      <section id="view-reviews">
+        <div class="toolbar data-toolbar">
+          <input id="review-search" type="search" placeholder="搜索公司 / 项目 / 标题 / 正文" autocomplete="off">
+          <select id="review-company-filter" aria-label="按公司筛选"><option value="">全部公司</option></select>
+          <select id="review-score-filter" aria-label="按评分筛选">
+            <option value="">全部评分</option>
+            <option value="5">5 星</option>
+            <option value="4">4 星</option>
+            <option value="3">3 星</option>
+            <option value="2">2 星</option>
+            <option value="1">1 星</option>
+          </select>
+          <label class="date-field"><input id="review-dirty-only" type="checkbox">仅看已修改</label>
+          <button id="review-save-button" type="button" disabled>保存修改（0）</button>
+          <button id="review-refresh" type="button" class="ghost">刷新</button>
+          <span id="review-count" class="count"></span>
+        </div>
+
+        <div id="review-batch" class="batch-bar" hidden>
+          <strong id="batch-selected">已选 0 条</strong>
+          <label class="batch-field">评分
+            <select id="batch-score">
+              <option value="">不修改</option>
+              <option value="5">5</option>
+              <option value="4">4</option>
+              <option value="3">3</option>
+              <option value="2">2</option>
+              <option value="1">1</option>
+            </select>
+          </label>
+          <label class="batch-field">项目
+            <select id="batch-project">
+              <option value="__keep">不修改</option>
+            </select>
+          </label>
+          <label class="batch-field">发布日期
+            <input id="batch-date" type="date">
+          </label>
+          <label class="batch-field">在职时长
+            <select id="batch-tenure">
+              <option value="__keep">不修改</option>
+              <option value="__clear">清空</option>
+            </select>
+          </label>
+          <label class="batch-field">标签
+            <select id="batch-tags-mode">
+              <option value="__keep">不修改</option>
+              <option value="add">追加</option>
+              <option value="replace">替换为</option>
+              <option value="clear">清空</option>
+            </select>
+          </label>
+          <div id="batch-tags" class="checks batch-tags" hidden></div>
+          <button id="batch-apply" type="button">应用到选中</button>
+          <button id="batch-clear" type="button" class="ghost">取消选择</button>
+        </div>
+
+        <div class="panel data-panel">
+          <div class="table-wrap">
+            <table class="data-table review-table">
+              <thead>
+                <tr>
+                  <th class="cell-select"><input id="review-select-all" type="checkbox" aria-label="全选当前列表"></th>
+                  <th>公司</th>
+                  <th>项目</th>
+                  <th>评分</th>
+                  <th>标题</th>
+                  <th>正文</th>
+                  <th>标签</th>
+                  <th>发布日期</th>
+                  <th>在职时长</th>
+                  <th>版本</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="review-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 公司 -->
+      <section id="view-companies" hidden>
+        <div class="toolbar data-toolbar">
+          <input id="company-search" type="search" placeholder="搜索公司名 / ID / slug / 别名" autocomplete="off">
+          <label class="date-field"><input id="company-dirty-only" type="checkbox">仅看已修改</label>
+          <button id="company-save-button" type="button" disabled>保存修改（0）</button>
+          <button id="company-refresh" type="button" class="ghost">刷新</button>
+          <span id="company-count" class="count"></span>
+        </div>
+
+        <div class="panel data-panel">
+          <div class="table-wrap">
+            <table class="data-table company-table">
+              <thead>
+                <tr>
+                  <th>公司名</th>
+                  <th>公司 ID</th>
+                  <th>slug</th>
+                  <th>别名（逗号分隔）</th>
+                  <th>项目数</th>
+                  <th>评价数</th>
+                  <th>最近更新</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="company-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 项目 -->
+      <section id="view-projects" hidden>
+        <div class="toolbar data-toolbar">
+          <input id="project-search" type="search" placeholder="搜索项目名 / 项目 ID / 公司" autocomplete="off">
+          <select id="project-company-filter" aria-label="按公司筛选"><option value="">全部公司</option></select>
+          <button id="project-new-button" type="button" class="ghost">＋ 新增项目</button>
+          <button id="project-save-button" type="button" disabled>保存修改（0）</button>
+          <button id="project-refresh" type="button" class="ghost">刷新</button>
+          <span id="project-count" class="count"></span>
+        </div>
+
+        <div id="project-new-form" class="panel new-project-form" hidden>
+          <div class="grid">
+            <label>所属公司
+              <select id="new-project-company"></select>
+            </label>
+            <label>项目名
+              <input id="new-project-name" maxlength="50" autocomplete="off">
+            </label>
+            <label>状态
+              <select id="new-project-status">
+                <option value="live">已上线</option>
+                <option value="dev">在研</option>
+                <option value="cancelled">已取消</option>
+                <option value="unknown">状态未知</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button id="new-project-add" type="button">添加</button>
+            <button id="new-project-cancel" type="button" class="ghost">取消</button>
+          </div>
+        </div>
+
+        <div class="panel data-panel">
+          <div class="table-wrap">
+            <table class="data-table project-table">
+              <thead>
+                <tr>
+                  <th>公司</th>
+                  <th>项目名</th>
+                  <th>项目 ID</th>
+                  <th>状态</th>
+                  <th>评价数</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="project-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <p id="global-status" class="status" role="status"></p>
+    </section>
+  </main>
+
+  <script type="module" src="/data.js"></script>
+</body>
+</html>

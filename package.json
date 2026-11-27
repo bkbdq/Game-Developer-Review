@@ -15,6 +15,7 @@
     "test:m6": "node scripts/test-m6.mjs",
     "test:admin": "node scripts/test-admin-match.mjs",
     "test:admin-review": "node scripts/test-admin-review.mjs",
+    "test:artwork": "node --test scripts/test-artwork.mjs",
     "dev": "npm run data:build && npm run dev --workspace site",
     "build": "npm run data:validate && npm run data:build && npm run build --workspace site",
     "build:dev": "npm run data:validate && npm run data:build:dev && npm run build --workspace site",
@@ -27,6 +28,9 @@
     "d1:export": "node scripts/export-d1.mjs"
   },
   "devDependencies": {
-    "ajv": "^8.20.0"
+    "ajv": "^8.20.0",
+    "htmlparser2": "^9.1.0",
+    "ipaddr.js": "^2.3.0",
+    "sharp": "0.35.5"
   }
 }

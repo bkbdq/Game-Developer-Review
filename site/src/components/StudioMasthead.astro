@@ -2,12 +2,14 @@
 import Mark from './Mark.astro';
 import { href, type Company } from '../lib/data';
 import { projectsByStudio } from '../lib/projects';
+import { catalogArtwork } from '../lib/artwork';
 interface Props { company: Company }
 const { company } = Astro.props;
 const titles = projectsByStudio.get(company.slug) ?? [];
 const featured = titles.find(p => p.cover);
-const banner = featured?.slug === 'cloudcape' && featured.id === 'p_windward'
-  ? href('images/studios/cloudcape.webp') : featured?.cover;
+const custom = catalogArtwork(company.id);
+const banner = custom?.banner ?? (featured?.slug === 'cloudcape' && featured.id === 'p_windward'
+  ? href('images/studios/cloudcape.webp') : featured?.cover);
 ---
 <header class="studio-mast">
   {banner && <img class="studio-panorama" src={banner} alt="" fetchpriority="high" />}
@@ -17,5 +19,5 @@ const banner = featured?.slug === 'cloudcape' && featured.id === 'p_windward'
     </div></div>
     <div class="studio-metrics"><span><b>{titles.length}</b> 个项目</span><span><b>{company.reviewCount}</b> 篇评价</span></div>
   </div>
-  {featured && <a class="studio-art-link" href={featured.path}>{featured.name} <span aria-hidden="true">↗</span></a>}
+  {!custom && featured && <a class="studio-art-link" href={featured.path}>{featured.name} <span aria-hidden="true">↗</span></a>}
 </header>

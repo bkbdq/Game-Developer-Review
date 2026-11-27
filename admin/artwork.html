@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: https://raw.githubusercontent.com; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://api.github.com; base-uri 'none'; form-action 'self'">
+  <title>配图管理 · goodcorp</title><link rel="stylesheet" href="/artwork.css">
+</head><body>
+<header class="bar"><div class="bar-inner"><a class="brand" href="/">goodcorp</a><span class="divider"></span><a href="/">审核控制台</a><span class="crumb">/</span><a href="/artwork.html" id="home">配图管理</a><span class="local">图片存储 · Cloudflare R2</span></div></header>
+<main>
+  <p id="repo-status" role="status">正在读取配图目录…</p>
+  <section id="manager" aria-labelledby="manager-title">
+  <header class="intro"><div><h1 id="manager-title">配图管理</h1><p>管理所有项目和公司的展示图。</p></div>
+    <button id="batch" class="secondary" disabled>批量查找缺图</button></header>
+  <p id="batch-status" role="status" hidden></p>
+  <section id="batch-review" hidden aria-label="批量候选"><div id="batch-items"></div><button id="batch-save" disabled>提交勾选的配图</button></section>
+    <div class="library">
+      <div class="library-tools"><div class="tabs" id="statuses" role="group" aria-label="配图状态">
+        <button data-status="all" aria-pressed="true">全部</button><button data-status="configured" aria-pressed="false">已配图</button><button data-status="missing" aria-pressed="false">缺图</button>
+      </div><div class="library-search"><select id="kind" aria-label="条目类型"><option value="all">全部类型</option><option value="project">项目</option><option value="company">公司</option></select>
+      <input id="filter" type="search" placeholder="筛选已收录的项目或公司" aria-label="筛选已收录的项目或公司"></div></div>
+      <table><thead><tr><th scope="col">条目</th><th scope="col">配图状态</th><th scope="col">操作</th></tr></thead><tbody id="targets"></tbody></table>
+      <p id="empty" class="empty" hidden></p><p id="count" role="status"></p>
+    </div>
+  </section>
+    <section class="desk" id="editor" hidden><a id="back" href="/artwork.html">← 返回配图管理</a><header class="entry"><div><p class="context" id="context">条目</p><h1 id="name"></h1></div><span id="state"></span></header>
+    <form id="search"><label for="query">联网找图</label><div class="search-row"><input id="query" type="search" required maxlength="100" autocomplete="off" aria-describedby="search-sources"><button>搜索图片</button><button type="button" id="ds-search" title="使用 DeepSeek 联网搜索，模型按 Token 计费">DeepSeek 找图</button></div></form>
+    <div class="search-help"><span id="search-sources"></span><a id="baike-page" target="_blank" rel="noopener noreferrer">打开百度百科词条 ↗</a><a id="web-search" target="_blank" rel="noopener noreferrer">去必应搜更多图片 ↗</a></div>
+    <p id="search-status" role="status"></p><p id="ds-status" role="status"></p>
+    <div id="candidates" role="group" aria-label="图片候选"></div>
+    <div class="preview-head"><h3>展示位预览</h3><div class="image-inputs"><small>可在此页按 Ctrl+V 粘贴图片</small><label class="file">从本机选图<input id="file" type="file" accept="image/jpeg,image/png,image/webp"></label></div></div>
+    <div id="previews"></div><div id="source"></div>
+    <div id="edit" hidden><div class="controls"><label>适配方式<select id="mode"><option value="cover">铺满裁切</option><option value="contain">完整保留</option></select></label>
+      <label>水平焦点<input id="x" type="range" min="0" max="100" value="50"></label><label>垂直焦点<input id="y" type="range" min="0" max="100" value="50"></label></div></div>
+    <footer><p id="message" role="status">选择候选图后可预览各展示位。</p><div class="editor-actions"><button id="discard" hidden>恢复当前配图</button><button class="primary" id="save" disabled>提交配图</button></div></footer>
+    <button id="legacy" hidden>使用旧版本机草稿</button>
+    </section>
+</main>
+<dialog id="signin"><form method="dialog">
+  <h2>登录审核台</h2><p>使用有仓库写权限的 GitHub Token 提交当前配图。</p>
+  <label>GitHub Token<input id="token" type="password" autocomplete="off" required></label>
+  <div><button value="cancel" formnovalidate>取消</button> <button value="submit" class="primary">登录并提交</button></div>
+</form></dialog><script type="module" src="/artwork.js"></script></body></html>

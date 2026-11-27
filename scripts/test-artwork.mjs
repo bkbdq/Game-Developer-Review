@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import { createArtworkLibrary } from '../tools/artwork-library.mjs';
 import { publishArtwork } from '../admin/lib/artwork-publish.js';
 import { uploadArtwork, readArtwork } from '../admin/functions/_lib/artwork-storage.js';
+import { onRequestPost as sharedSearch } from '../admin/functions/api/admin/artwork-search.js';
 import { createHash } from 'node:crypto';
 import { readArtworkRepository } from '../admin/lib/artwork-repository.js';
 import { sizes } from '../admin/lib/artwork-sizes.js';
@@ -33,7 +34,7 @@ test('常规项目搜索包含 TapTap 同名游戏并去重，不调用 DeepSeek
 });
 
 test('DS 直接返回可提交的图片，跳过无法读取的网页，并从过期图片回退到网页主图', async t => {
-  assert.throws(()=>deepSeekArtwork('作品','project','工作室',''),e=>e.status===503);
+  assert.throws(()=>deepSeekArtwork('作品','project','工作室',''),e=>e.status===401);
   const page='https://official.example/game', bad='https://other.example/game';
   const raw=await sharp({create:{width:400,height:200,channels:3,background:'#343434'}}).png().toBuffer();
   t.mock.method(globalThis,'fetch', async (url,opts) => {
@@ -169,6 +170,43 @@ test('本机同源页面无需登录即可找图和读取缓存，后台凭证�
   assert.equal((await sharp(Buffer.from(photo.webp,'base64')).metadata()).format,'webp');
   assert.deepEqual(await post(),result);
   assert.equal(calls,2);
+});
+
+test('未配置本机 Key 的协作者用审核台身份共享搜索，返回可解码的图片', async t => {
+  const origin = 'https://admin.goodcorp.games';
+  const env = {GITHUB_OWNER:'org',GITHUB_REPO:'repo',DEEPSEEK_API_KEY:'cloud-fixture'};
+  const photoPage = 'https://official.example/press';
+  const raw = await sharp({create:{width:320,height:180,channels:3,background:'#13495c'}}).png().toBuffer();
+  let calls = 0;
+  t.mock.method(globalThis,'fetch',async (address,options) => {
+    const url = new URL(address);
+    if (url.origin === origin) {
+      assert.equal(options.headers.Authorization,'Bearer reviewer-fixture');
+      return sharedSearch({request:new Request(url,options),env});
+    }
+    if (url.origin === 'https://api.github.com') {
+      assert.equal(options.headers.Authorization,'Bearer reviewer-fixture');
+      return Response.json(url.pathname === '/user' ? {login:'colleague'} : {permissions:{push:true}});
+    }
+    assert.equal(url.href,'https://api.deepseek.com/responses');
+    assert.equal(options.headers.Authorization,'Bearer cloud-fixture');
+    assert.ok(!options.body.includes('reviewer-fixture'));
+    calls++;
+    return Response.json({output:[{type:'web_search_call',action:{sources:[{url:photoPage,title:'作品'}]}}]});
+  });
+  const path = origin+'/api/admin/artwork-search?kind=project&name=Fixture';
+  assert.equal((await sharedSearch({request:new Request(path,{method:'POST'}),env})).status,401);
+  const valid = {method:'POST',headers:{Authorization:'Bearer reviewer-fixture'}};
+  assert.equal((await sharedSearch({request:new Request(path+'&model=other',valid),env})).status,400);
+  assert.equal((await sharedSearch({request:new Request(path,valid),env:{...env,DEEPSEEK_API_KEY:''}})).status,503);
+  assert.equal(calls,0);
+  const read = async (url,type) => type === 'html'
+    ? {url,bytes:Buffer.from('<meta property="og:image" content="/poster.png">')} : {url,bytes:raw};
+  const result = await discoverArtwork('测试作品','project','测试公司','',s => sourceImage(s,read),[],'reviewer-fixture');
+  assert.equal(calls,1);
+  assert.equal(result.candidates[0].provider,'DeepSeek');
+  assert.equal((await sharp(Buffer.from(result.candidates[0].webp,'base64')).metadata()).width,320);
+  assert.doesNotMatch(JSON.stringify(result),/reviewer-fixture|cloud-fixture/);
 });
 
 test('R2 配图接口在存储未绑定或上传不完整时拒绝提交', async t => {

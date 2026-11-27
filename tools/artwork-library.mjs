@@ -94,7 +94,9 @@ export function createArtworkLibrary(root, { deepSeekKey = process.env.DEEPSEEK_
           if (!q || q.length > 100 || studio.length > 180 || !['project','company'].includes(p.kind)) throw error('请输入有效名称');
           const works = url.searchParams.getAll('work').map(s => s.trim());
           if (works.length > 5 || works.some(s => !s || s.length > 160)) throw error('关联作品名称无效');
-          return reply(res, await deepSeekArtwork(q, p.kind, studio, deepSeekKey, works));
+          const authorization = req.headers.authorization || '';
+          const reviewerToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+          return reply(res, await deepSeekArtwork(q, p.kind, studio, deepSeekKey, works, reviewerToken));
         }
         if (action !== 'prepare') throw error('路径无效', 404);
         return reply(res, await prepare(p, await limitedBytes(req)));

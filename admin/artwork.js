@@ -321,7 +321,20 @@ async function searchDeepSeek(e) {
   }
   const path = api('deepseek', params);
   try {
-    const result = await (await request(path, {method:'POST', headers:{'X-Artwork-Save':'1'}})).json();
+    const run = token => request(path, {method:'POST', headers:{
+      'X-Artwork-Save':'1', ...(token ? {Authorization:'Bearer ' + token} : {}),
+    }});
+    let response;
+    try { response = await run(getToken()); }
+    catch (err) {
+      if (err.status !== 401) throw err;
+      clearToken();
+      const token = await askForToken();
+      if (!token) { e.dsStatus = '已取消共享找图。'; return; }
+      response = await run(token);
+      setToken(token);
+    }
+    const result = await response.json();
     if (term !== e.term.trim()) { e.dsStatus = '关键词已更改，请重新找图。'; return; }
     clearDeepSeekCandidates(e);
     e.dsCandidates = result.candidates.map(({webp,...c}) => {

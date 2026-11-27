@@ -1,6 +1,7 @@
 import { lookup } from 'node:dns/promises';
 import { get } from 'node:https';
-import { isIP } from 'node:net';
+import { webUrl } from '../admin/functions/_lib/artwork-url.js';
+export { webUrl };
 import ipaddr from 'ipaddr.js';
 import { Parser } from 'htmlparser2';
 import sharp from 'sharp';
@@ -12,17 +13,6 @@ const storeDomains = ['taptap.cn','tapimg.com','steampowered.com','steamstatic.c
   'mihoyo.com','hoyoverse.com','hoyolab.com','hoyoverse.cn','yuanshen.com','youthcatgames.com','chuapp.com',
   'avatars.cdn.queniuqe.com','avatars.st.dl.eccdnx.com','www.nexarda.com','imgcdn1.nexarda.com'];
 const proxyRange = ipaddr.parseCIDR('198.18.0.0/15');
-export function webUrl(value, base) {
-  if (typeof value !== 'string' || !value.trim() || value.length > 2048) return null;
-  try {
-    const u = new URL(value, base);
-    if (u.protocol !== 'https:' || u.port || u.username || u.password || !u.hostname.includes('.') ||
-        isIP(u.hostname) || u.hostname.endsWith('.localhost') || u.hostname.endsWith('.local')) return null;
-    u.hash = '';
-    return u.href;
-  } catch { return null; }
-}
-
 // Pin the connection to a public address, including for every redirect.
 function publicAddress(host, options, callback) {
   lookup(host, {family:4, all:true}).then(records => {

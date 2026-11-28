@@ -1,6 +1,6 @@
 ---
 import Mark from './Mark.astro';
-import { href, type Company } from '../lib/data';
+import { type Company } from '../lib/data';
 import { projectsByStudio } from '../lib/projects';
 import { catalogArtwork } from '../lib/artwork';
 interface Props { company: Company }
@@ -8,8 +8,7 @@ const { company } = Astro.props;
 const titles = projectsByStudio.get(company.slug) ?? [];
 const featured = titles.find(p => p.cover);
 const custom = catalogArtwork(company.id);
-const banner = custom?.banner ?? (featured?.slug === 'cloudcape' && featured.id === 'p_windward'
-  ? href('images/studios/cloudcape.webp') : featured?.cover);
+const banner = custom?.banner ?? featured?.cover;
 ---
 <header class="studio-mast">
   {banner && <img class="studio-panorama" src={banner} alt="" fetchpriority="high" />}

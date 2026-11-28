@@ -6,7 +6,7 @@ function location(parts) {
   if (!Array.isArray(parts)) return null;
   const [company, target, version] = parts;
   if (!/^c_[a-z0-9_-]+$/.test(company) || !/^(studio|p_[a-z0-9_-]+)$/.test(target) || !/^[a-f0-9]{16}$/.test(version)) return null;
-  return {prefix:`catalog/${company}/${target}/${version}/`, names:['source', ...sizes[target === 'studio' ? 'company' : 'project'].map(s => s.key)]};
+  return {prefix:`catalog/${company}/${target}/${version}/`, names:sizes[target === 'studio' ? 'company' : 'project'].map(s => s.key)};
 }
 
 export async function uploadArtwork({request, env, params}) {

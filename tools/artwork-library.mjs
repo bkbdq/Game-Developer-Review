@@ -62,7 +62,7 @@ export function createArtworkLibrary(root, { deepSeekKey = process.env.DEEPSEEK_
     const version = createHash('sha256').update(data).update(JSON.stringify(settings)).digest('hex').slice(0,16);
     const saved = { version, ...settings };
     const formats = sizes[target === 'studio' ? 'company' : 'project'];
-    const files = { source:data.toString('base64') };
+    const files = {};
     for (const { key, width, height } of formats) {
       let pipeline = sharp(data);
       if (mode === 'contain') {
@@ -76,7 +76,8 @@ export function createArtworkLibrary(root, { deepSeekKey = process.env.DEEPSEEK_
       const output = await pipeline.flatten({background: '#e9eff1'}).webp({quality: 86}).toBuffer();
       files[key] = output.toString('base64');
     }
-    return { saved, files };
+    // 归一化原图只回传给浏览器做本地预览与版本哈希，不进上传表单，也不入 R2。
+    return { saved, source:data.toString('base64'), files };
   }
 
   async function handle(req, res, url) {

@@ -3,7 +3,8 @@ import { config } from '../config.js';
 export const artworkStem = (company, target) => 'site/public/images/catalog/' + company + '/' + target;
 export const artworkUrl = (item, version, key) => '/api/artwork/' + [item.company,item.target,version,key + '.webp'].join('/');
 
-// Resolve both metadata and originals against the same tree, even if main moves during editing.
+// Metadata and thumbnails resolve against one tree snapshot; git-era originals come from the same
+// tree, while R2 records re-fetch the original from the source page recorded in current.json.
 export async function readArtworkRepository(local, token, fetchImpl = fetch) {
   const { owner, publicRepo, publicBranch } = config;
   const base = 'https://api.github.com/repos/' + owner + '/' + publicRepo;
@@ -66,8 +67,10 @@ export async function readArtworkRepository(local, token, fetchImpl = fetch) {
     async original(e) {
       const saved = await manifest(e.remoteSha);
       if (saved.storage === 'r2') {
-        const response = await fetchImpl(artworkUrl(e,saved.version,'source'));
-        if (!response.ok || response.headers.get('content-type')?.split(';')[0] !== 'image/webp') throw new Error('无法读取 R2 中的配图原图');
+        // 原图不入桶：按记录的出处页重新读取；出处失效时提示重新选图。
+        if (!saved.image) throw new Error('该配图没有保存原始图片地址，请重新搜索、粘贴或从本机选图');
+        const response = await fetchImpl('/api/local/artwork/image?' + new URLSearchParams({url:saved.image}));
+        if (!response.ok) throw new Error('无法从记录的出处读取原图，请重新搜索或从本机选图');
         return {saved,file:await response.blob()};
       }
       const source = paths.get(artworkStem(e.company,e.target) + '/' + saved.version + '-source.webp');

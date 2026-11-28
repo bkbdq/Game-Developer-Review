@@ -94,6 +94,7 @@ figcaption small {font:11px/1.4 ui-monospace,monospace}
 .stage-buttons {display:flex;gap:8px}
 .proposal strong,.proposal small {display:block}.proposal small {font-size:11px}
 .proposal {border:1px solid var(--line);padding:4px 6px;border-radius:5px;font-size:12px}.proposal img {width:50px;height:32px;object-fit:contain;background:#e9eff1}.proposal button {padding:3px 6px;font-size:11px}
+.proposal .staged-open {cursor:pointer}
 @media(max-width:760px){
   .intro {padding-block:18px}.intro h1 {font-size:24px}.intro p {max-width:28ch}
   .library-tools {padding:10px}.library-search {width:100%}.library-search #filter {min-width:0;flex:1}

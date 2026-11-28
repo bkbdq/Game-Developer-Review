@@ -278,7 +278,8 @@ function listen(port, attempts) {
   delete process.env.DEEPSEEK_API_KEY;
   server.once('error', error => {
     if (error.code === 'EADDRINUSE' && attempts > 0) {
-      console.warn(`端口 ${port} 被占用，尝试 ${port + 1}`);
+      // 浏览器本地暂存按「域名+端口」隔离，端口漂移会让暂存条目"消失"。
+      console.warn(`端口 ${port} 被占用，尝试 ${port + 1}（注意：换端口后看不到之前实例暂存的条目）`);
       setTimeout(() => listen(port + 1, attempts - 1), 50);
       return;
     }

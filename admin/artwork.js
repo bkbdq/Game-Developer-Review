@@ -62,6 +62,14 @@ async function restoreStage() {
 function loadStage() {
   return stagedMap;
 }
+// 暂存条目的列表缩略图（本机 card 档的 object URL），条目被移除时回收。
+const stagedThumbs = new Map();
+function syncStagedThumbs() {
+  const map = loadStage();
+  for (const [key, url] of stagedThumbs) {
+    if (!map[key]) { URL.revokeObjectURL(url); stagedThumbs.delete(key); }
+  }
+}
 function saveStage(map) {
   stagedMap = map;
   persistStage(map).catch(err => {
@@ -106,12 +114,19 @@ function directory() {
     btn.disabled = !repository && key !== 'all';
   }
   $('targets').replaceChildren(...list.map(e => {
-    const staged = Boolean(loadStage()[e.company + '/' + e.target]);
+    const skey = e.company + '/' + e.target;
+    const staged = Boolean(loadStage()[skey]);
+    // 暂存条目直接用本机暂存的 card 档做缩略图，暂存后列表立刻可见。
+    let thumb = e.thumbnail;
+    if (staged) {
+      if (!stagedThumbs.has(skey)) stagedThumbs.set(skey, URL.createObjectURL(webpFile(loadStage()[skey].files.card)));
+      thumb = stagedThumbs.get(skey);
+    }
     const thumbnail = h('span', {class:'thumbnail', 'aria-hidden':'true'}, e.kind === 'company' ? '企' : '项');
-    if (e.thumbnail) thumbnail.append(h('img', {src:e.thumbnail, alt:'', loading:'lazy', referrerPolicy:'no-referrer', onerror:ev=>ev.target.remove()}));
-    const link = h('a', {href:viewUrl(e), class:'manage-link', 'aria-label':(e.remoteSha ? '编辑配图：' : '配置图片：') + e.name,
+    if (thumb) thumbnail.append(h('img', {src:thumb, alt:'', loading:'lazy', referrerPolicy:'no-referrer', onerror:ev=>ev.target.remove()}));
+    const link = h('a', {href:viewUrl(e), class:'manage-link', 'aria-label':(e.remoteSha ? '编辑配图：' : staged ? '继续编辑：' : '配置图片：') + e.name,
       onclick:ev => { if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return; ev.preventDefault(); openEntry(e); }},
-      e.remoteSha ? '编辑配图' : e.changed ? '继续配图' : '配置图片');
+      e.remoteSha ? '编辑配图' : staged ? '继续编辑' : e.changed ? '继续配图' : '配置图片');
     return h('tr', {}, h('th', {scope:'row'}, h('div', {class:'identity'}, thumbnail, h('span', {}, h('strong', {}, e.name),
       h('small', {}, e.kind === 'company' ? '公司' : '项目 · ' + e.studio)))),
       h('td', {}, h('span', {class:'status' + (e.remoteSha ? ' ready' : '')},
@@ -206,7 +221,7 @@ function choose(e, candidate, existing = '') {
     if (e.pick !== candidate) return;
     e.loaded = true;
     const origin = candidate.storage === 'r2' ? 'Cloudflare R2' : '仓库 main';
-    e.message = '原图 ' + img.naturalWidth + ' × ' + img.naturalHeight + (existing === 'remote' ? ' · 来自' + origin : existing === 'draft' ? ' · 本机旧草稿，可直接提交' : ' · 确认后可提交');
+    e.message = '原图 ' + img.naturalWidth + ' × ' + img.naturalHeight + (existing === 'remote' ? ' · 来自' + origin : existing === 'draft' ? ' · 本机旧草稿，可直接提交' : existing === 'staged' ? ' · 本机暂存，可调整后重新暂存或直接批量上传' : ' · 确认后可提交');
     refresh(e);
   };
   img.onerror = () => {
@@ -258,9 +273,17 @@ function openEntry(e, navigate = true) {
   window.scrollTo(0,0);
   draw();
   if (e.pick || e.loading) return;
+  const staged = loadStage()[e.company + '/' + e.target];
+  if (staged) { openStaged(e, staged); return; }
   if (e.remoteSha) void openRemote(e);
   else if (e.draft) openDraft(e);
   else if (!e.searched && !e.ticket) void search(e, e.term);
+}
+
+// 从本机暂存恢复编辑：原图就在 IndexedDB 里，不联网、不触发搜索。
+function openStaged(e, s) {
+  const file = webpFile(s.source);
+  choose(e, {...s.saved, file, local:URL.createObjectURL(file)}, 'staged');
 }
 
 function openDraft(e) {
@@ -559,15 +582,19 @@ let stageThumbs = [];
 function stageReview() {
   const map = loadStage();
   const items = Object.entries(map);
+  syncStagedThumbs();
   for (const url of stageThumbs) URL.revokeObjectURL(url);
   stageThumbs = [];
   $('stage-review').hidden = !items.length;
   $('stage-items').replaceChildren(...items.map(([key, s]) => {
     const thumb = URL.createObjectURL(webpFile(s.files.card));
     stageThumbs.push(thumb);
+    const entry = entries.find(row => row.company === s.company && row.target === s.target);
+    const open = entry ? () => openEntry(entry) : null;
     return h('div', {class:'proposal'},
-      h('img', {src:thumb, alt:'', referrerPolicy:'no-referrer'}),
-      h('span', {}, h('strong', {}, s.name), h('small', {}, s.saved.provider + ' · ' + s.saved.title + ' · 待上传')),
+      h('img', {src:thumb, alt:'', referrerPolicy:'no-referrer', ...(open ? {onclick:open, class:'staged-open'} : {})}),
+      h('span', {class: open ? 'staged-open' : '', title: open ? '打开继续编辑' : '', ...(open ? {onclick:open} : {})},
+        h('strong', {}, s.name), h('small', {}, s.saved.provider + ' · ' + s.saved.title + ' · 待上传')),
       h('button', {type:'button', 'aria-label':'移除暂存：' + s.name, onclick:() => {
         const rest = loadStage(); delete rest[key]; saveStage(rest);
         stageReview(); directory();

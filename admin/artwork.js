@@ -21,21 +21,53 @@ async function request(path, options) {
 let entries = [], active, status = 'all', batch, repository;
 let publishing = false;
 const proposed = new Set(), checked = new Set();
-const STAGE_KEY = 'goodcorp-artwork-staging';
-function loadStage() {
+const STAGE_DB = 'goodcorp-artwork-staging';
+// 暂存（含裁切出的图片 Blob）存 IndexedDB；内存里保留一份同步副本，
+// directory()/stageReview() 等同步逻辑直接读它。
+let stagedMap = {};
+function stageDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(STAGE_DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('staged');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function persistStage(map) {
+  return stageDb().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction('staged', 'readwrite');
+    const store = tx.objectStore('staged');
+    store.clear();
+    for (const [key, value] of Object.entries(map)) store.put(value, key);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB 写入被中止'));
+  }));
+}
+async function restoreStage() {
+  try { localStorage.removeItem('goodcorp-artwork-staging'); } catch { /* 旧键清理失败不影响 */ }
   try {
-    const map = JSON.parse(localStorage.getItem(STAGE_KEY) || '{}');
-    if (!map || typeof map !== 'object' || Array.isArray(map)) return {};
-    // 旧版暂存只记录出处地址、不含版本，无法直接提交，读取时丢弃。
-    for (const key of Object.keys(map)) {
-      if (!/^[0-9a-f]{16}$/.test(map[key]?.saved?.version || '')) delete map[key];
-    }
-    return map;
-  } catch { return {}; }
+    const db = await stageDb();
+    const rows = await new Promise((resolve, reject) => {
+      const store = db.transaction('staged').objectStore('staged');
+      const values = store.getAll(), keys = store.getAllKeys();
+      let done = 0;
+      const finish = () => resolve(keys.result.map((key, i) => [key, values.result[i]]));
+      values.onsuccess = keys.onsuccess = () => { if (++done === 2) finish(); };
+      values.onerror = keys.onerror = () => reject(values.error);
+    });
+    stagedMap = Object.fromEntries(rows.filter(([, s]) => /^[0-9a-f]{16}$/.test(s?.saved?.version || '')));
+  } catch { stagedMap = {}; }
+}
+function loadStage() {
+  return stagedMap;
 }
 function saveStage(map) {
-  try { localStorage.setItem(STAGE_KEY, JSON.stringify(map)); }
-  catch { /* 本机暂存写不进时不阻塞浏览 */ }
+  stagedMap = map;
+  persistStage(map).catch(err => {
+    const e = active;
+    if (e) { e.message = '暂存写入本机失败 · ' + (err.message || err); if (active === e) $('message').textContent = e.message; }
+  });
 }
 function matchingEntries() {
   const kind = $('kind').value;
@@ -124,7 +156,7 @@ function draw() {
   $('save').textContent = e.remoteSha ? '保存配图修改' : '提交配图';
   $('stage').hidden = !e.pick || !e.loaded;
   $('stage').disabled = e.saving || publishing;
-  $('stage').title = '按当前裁切生成展示图并上传到 Cloudflare R2，加入暂存列表稍后批量提交';
+  $('stage').title = '按当前裁切生成展示图并暂存到本机浏览器，稍后批量上传';
   $('discard').hidden = !e.current || !e.changed;
   $('discard').disabled = e.saving;
   $('message').textContent = e.message || '确认后将展示图保存到 Cloudflare R2，原图不进存储桶。';
@@ -457,16 +489,18 @@ async function publish(items, report, onDone) {
     }
     setToken(token);
     const stagedCount = items.filter(e => e.staged).length;
-    report(stagedCount === items.length ? '正在将暂存的配图记录提交到正式仓库…' : '正在将展示图保存到 Cloudflare R2…');
+    report(stagedCount === items.length ? '正在上传暂存的展示图并提交记录…' : '正在将展示图保存到 Cloudflare R2…');
     const previews = new Map();
-    const result = await publishArtwork({client:createClient(token), config, items,
-      upload:async (item, version, files) => { if (!item.staged) await uploadArtwork(token, item, version, files); },
-      prepare:async e => {
-        if (e.staged) return {saved:e.staged.saved, files:{}};
-        const prepared = await prepare(e);
-        previews.set(e, {source:webpFile(prepared.source), card:webpFile(prepared.files.card)});
-        return prepared;
-      }});
+    const result = await publishArtwork({client:createClient(token), config, items, upload:(...args)=>uploadArtwork(token,...args), prepare:async e => {
+      if (e.staged) {
+        // 暂存条目已在本机裁切好，批量时直接复用成品上传。
+        previews.set(e, {source:webpFile(e.staged.source), card:webpFile(e.staged.files.card)});
+        return {saved:e.staged.saved, source:e.staged.source, files:e.staged.files};
+      }
+      const prepared = await prepare(e);
+      previews.set(e, {source:webpFile(prepared.source), card:webpFile(prepared.files.card)});
+      return prepared;
+    }});
     items.forEach((e,i) => {
       const record = result.records[i];
       e.saved = record.saved; e.remoteSha = record.sha; e.changed = false;
@@ -521,19 +555,25 @@ $('batch-save').onclick = () => {
   void publish(list, msg => { $('batch-status').textContent = msg; });
 };
 
+let stageThumbs = [];
 function stageReview() {
   const map = loadStage();
   const items = Object.entries(map);
+  for (const url of stageThumbs) URL.revokeObjectURL(url);
+  stageThumbs = [];
   $('stage-review').hidden = !items.length;
-  $('stage-items').replaceChildren(...items.map(([key, s]) => h('div', {class:'proposal'},
-    h('img', {src:artworkUrl(s, s.saved.version, 'card'), alt:'', referrerPolicy:'no-referrer',
-      onerror:ev => ev.target.remove()}),
-    h('span', {}, h('strong', {}, s.name), h('small', {}, s.saved.provider + ' · ' + s.saved.title + ' · 已上传 R2')),
-    h('button', {type:'button', 'aria-label':'移除暂存：' + s.name, onclick:() => {
-      const rest = loadStage(); delete rest[key]; saveStage(rest);
-      stageReview(); directory();
-    }}, '移除'))));
-  $('stage-upload').textContent = '批量提交暂存（' + items.length + '）';
+  $('stage-items').replaceChildren(...items.map(([key, s]) => {
+    const thumb = URL.createObjectURL(webpFile(s.files.card));
+    stageThumbs.push(thumb);
+    return h('div', {class:'proposal'},
+      h('img', {src:thumb, alt:'', referrerPolicy:'no-referrer'}),
+      h('span', {}, h('strong', {}, s.name), h('small', {}, s.saved.provider + ' · ' + s.saved.title + ' · 待上传')),
+      h('button', {type:'button', 'aria-label':'移除暂存：' + s.name, onclick:() => {
+        const rest = loadStage(); delete rest[key]; saveStage(rest);
+        stageReview(); directory();
+      }}, '移除'));
+  }));
+  $('stage-upload').textContent = '批量上传暂存（' + items.length + '）';
   $('stage-upload').disabled = publishing || !items.length || !repository;
   $('stage-clear').disabled = publishing || !items.length;
 }
@@ -570,30 +610,20 @@ $('stage-upload').onclick = () => {
 $('stage').onclick = async () => {
   const e = active;
   if (!e || !e.pick || !e.loaded || e.saving || publishing) return;
-  const token = getToken() || await askForToken();
-  if (!token) return;
-  try { await createApi(token).me(); }
-  catch (err) {
-    if (err.status === 401 || err.status === 403) clearToken();
-    e.message = '暂存失败 · ' + err.message;
-    refresh(e);
-    return;
-  }
-  setToken(token);
   e.saving = true;
-  e.message = '正在按当前裁切生成展示图并上传到 Cloudflare R2…';
+  e.message = '正在按当前裁切生成展示图，暂存到本机浏览器…';
   refresh(e);
   try {
     const prepared = await prepare(e);
-    await uploadArtwork(token, e, prepared.saved.version, prepared.files);
-    const map = loadStage();
-    map[e.company + '/' + e.target] = {saved: prepared.saved, company:e.company, target:e.target,
-      name:e.name, kind:e.kind, studio:e.studio, at:Date.now()};
-    saveStage(map);
-    e.message = '已按当前裁切上传到 R2 并加入暂存列表，回到配图管理可批量提交。';
+    const map = {...loadStage(), [e.company + '/' + e.target]: {saved: prepared.saved, files: prepared.files,
+      source: prepared.source, company:e.company, target:e.target, name:e.name, kind:e.kind,
+      studio:e.studio, at:Date.now()}};
+    await persistStage(map);
+    stagedMap = map;
+    e.message = '已按当前裁切暂存到本机浏览器（尚未上传），回到配图管理可批量上传。';
     stageReview();
   } catch (err) {
-    e.message = '暂存失败 · ' + err.message;
+    e.message = '暂存失败 · ' + (err.message || err);
   } finally {
     e.saving = false;
     refresh(e);
@@ -610,6 +640,7 @@ try {
   }
   entries = data.map(e => ({ ...e, draft:e.draft?.storage === 'r2' ? null : e.draft, remoteSha:e.remoteSha ?? null, term:e.name, candidates:[], ticket:0,
     x:50, y:50, mode:e.kind === 'company' ? 'contain' : 'cover' }));
+  await restoreStage();
   followLocation();
   stageReview();
 } catch (err) {

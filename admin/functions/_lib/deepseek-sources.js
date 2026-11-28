@@ -52,23 +52,30 @@ function selectedLogos(output, sources) {
 
 export async function findArtworkSources({name, aliases, kind, studio, works}, key) {
   const company = kind === 'company';
-  const response = await fetch('https://api.deepseek.com/responses', {
-    method:'POST', redirect:'error', signal:AbortSignal.timeout(65000),
-    headers:{'Content-Type':'application/json', Authorization:'Bearer ' + key},
-    body:JSON.stringify({model:'deepseek-flash', stream:false, tools:[{type:'deepseek_web_search'}],
-      instructions:company ? companyInstructions : projectInstructions,
-      input:JSON.stringify({名称:name,别名:aliases,类型:company ? '游戏公司或工作室' : '游戏项目',
-        已知作品:company ? works : undefined,
-        所属公司:kind === 'project' ? studio : undefined}),
-      max_output_tokens:1800}),
-  });
+  let response;
+  try {
+    response = await fetch('https://api.deepseek.com/responses', {
+      method:'POST', redirect:'error', signal:AbortSignal.timeout(65000),
+      headers:{'Content-Type':'application/json', Authorization:'Bearer ' + key},
+      body:JSON.stringify({model:'deepseek-flash', stream:false, tools:[{type:'deepseek_web_search'}],
+        instructions:company ? companyInstructions : projectInstructions,
+        input:JSON.stringify({名称:name,别名:aliases,类型:company ? '游戏公司或工作室' : '游戏项目',
+          已知作品:company ? works : undefined,
+          所属公司:kind === 'project' ? studio : undefined}),
+        max_output_tokens:1800}),
+    });
+  } catch (error) {
+    // 连接层失败要带出真实原因（name + message），否则排障只能看到兜底文案。
+    throw problem('DeepSeek 连接失败：' + ((error && error.name) || 'Error') + ' ' + ((error && error.message) || ''), 503);
+  }
   if (!response.ok) {
     const messages = {401:'后台 DeepSeek 凭证不可用，请联系维护者',403:'后台 DeepSeek 账户无权使用联网搜索，请联系维护者',
       402:'DeepSeek 账户余额不足',429:'DeepSeek 请求过于频繁，请稍后再试'};
-    throw problem(messages[response.status] || 'DeepSeek 暂时无法搜索', [402,429].includes(response.status) ? response.status : 502);
+    // 统一用 503 而不是 502：Pages 自定义域会把 502 响应替换成边缘错误页，客户端只能看到纯文本。
+    throw problem(messages[response.status] || 'DeepSeek 暂时无法搜索', [402,429].includes(response.status) ? response.status : 503);
   }
-  const body = await response.json();
-  if (body.error || body.status === 'failed' || !Array.isArray(body.output)) throw problem('DeepSeek 搜索未完成',502);
+  const body = await response.json().catch(() => null);
+  if (!body || body.error || body.status === 'failed' || !Array.isArray(body.output)) throw problem('DeepSeek 搜索未完成',503);
   const observed = artworkSources(body.output);
   return company ? selectedLogos(body.output,observed) : observed.slice(0,6);
 }

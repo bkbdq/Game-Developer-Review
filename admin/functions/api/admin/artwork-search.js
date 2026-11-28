@@ -22,6 +22,7 @@ export async function onRequestPost({request, env}) {
     return json({sources});
   } catch (error) {
     if (error.status) return fail(error.status,error.message);
-    return fail(502,'正式后台暂时无法连接 DeepSeek，请稍后重试');
+    // 503 而不是 502：Pages 自定义域会把 502 替换成边缘纯文本错误页，真实信息到不了客户端。
+    return fail(503,'正式后台暂时无法连接 DeepSeek：' + ((error && error.message) || '未知错误'));
   }
 }

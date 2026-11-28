@@ -56,7 +56,7 @@ export async function findArtworkSources({name, aliases, kind, studio, works}, k
   try {
     // redirect 必须用 manual：Workers 运行时不支持 'error'，会在发起连接前直接抛 TypeError。
     response = await fetch('https://api.deepseek.com/responses', {
-      method:'POST', redirect:'manual', signal:AbortSignal.timeout(65000),
+      method:'POST', redirect:'manual', signal:AbortSignal.timeout(120000),
       headers:{'Content-Type':'application/json', Authorization:'Bearer ' + key},
       body:JSON.stringify({model:'deepseek-flash', stream:false, tools:[{type:'deepseek_web_search'}],
         instructions:company ? companyInstructions : projectInstructions,

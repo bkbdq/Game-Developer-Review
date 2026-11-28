@@ -135,6 +135,15 @@
 - [x] 不引入账号、手机号、邮箱验证或设备指纹
 - [ ] 无感人机验证、可疑队列、集中评价提醒等方案池待定（需求文档明确本期不做）
 
+## M8 配图管理（artwork，2026-11-27 起实现）
+
+- [x] 本机配图工具（`start-artwork.cmd`）：搜图（Steam / TapTap / 应用宝 / 百科 / 维基，防 SSRF 白名单）、DeepSeek 找图（无 Key 协作者走云端共享代理）、sharp 裁切（内容寻址版本号，同图同参数幂等）
+- [x] 云端存储：R2 桶 `gdr-artwork` 绑定为 `gdr-admin` 生产变量 `ARTWORK`；展示图分档（公司 banner/card，项目 cover/card/detail）入桶，**原图不入桶**，编辑配图按记录出处重新读取（旧 Git 配图双轨兼容）
+- [x] 配图记录：`site/public/images/catalog/<公司>/<目标>/current.json`，Git Data API 单次原子提交 + 乐观锁；展示站构建时消费（`site/src/lib/artwork.ts`）
+- [x] 暂存：裁切成品存浏览器 IndexedDB（纯本地草稿，不需登录）；「批量上传暂存」逐条传 R2 并合并为一次记录提交；卡片点击继续编辑（读本机原图，不触发抓图），目录缩略图随暂存同步
+- [x] 审核台界面改版（顶栏、配色）；共享 DeepSeek 修复：Workers 不支持 `redirect:'error'`、自定义域 502 会被替换成边缘错误页（错误状态改用 503）、搜索超时放宽至云端 120s / 本机 135s
+- [x] 测试：`npm run test:artwork` 11 例（裁切、批量提交、重试幂等、暂存兼容、错误路径），`npm run data:validate` / `npm run build` 通过
+
 ## 部署待办（需工作电脑 + Cloudflare 权限）
 
 > 2026-11-24 已用本机 `.secrets/cloudflare.env` 中的 API Token 执行以下部署。
@@ -142,6 +151,7 @@
 - [x] D1：执行 `survey/migrations/0002_requests.sql`
 - [x] `gdr-site` / `gdr-site-dev`：绑定 D1 `DB`，配置 `IP_SALT`、`ALLOWED_ORIGINS`
 - [x] `gdr-survey`：配置 `POW_SECRET`、`POW_DIFFICULTY`，重新部署
+- [x] 配图 R2（2026-11-28）：账号开通 R2 后建桶 `gdr-artwork`（APAC），经 Pages API 绑定为 `gdr-admin` 生产变量 `ARTWORK`，探测验证通过（读图 404 图片不存在 / 匿名上传 401）
 - [x] 清理 Worker：填入真实 `database_id`，执行 `npm run deploy:cleanup`，Cron 已生效
 - [x] 重新部署 `gdr-survey`、`gdr-site`、`gdr-admin`（另含 `gdr-site-dev`）
 - [x] 联调：问卷服务端 PoW、删除/更正申请、回执状态查询、联系消息；审核台队列 API 已部署（未带 token 时 401 正常，实际处理动作待用 PAT 登录实测）

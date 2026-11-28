@@ -83,8 +83,7 @@ body .topbar { background:#101a23; border-color:#2e404d; color:#edf4f7; }
 .feature-excerpts blockquote { margin:0; padding-left:14px; border-left:3px solid #7bcdd1; }
 .feature-excerpts p { margin:0; font-size:clamp(16px,1.35vw,19px); line-height:1.65; color:#ecf5f8; white-space:pre-line; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
 .feature-grade .grade { font-size:18px; }
-.feature-bottom { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:auto; border-top:1px solid #496070; padding-top:13px; }
-.feature-bottom .review-cta { margin-inline-start:auto; }
+.feature-bottom { display:flex; justify-content:flex-end; margin-top:auto; border-top:1px solid #496070; padding-top:13px; }
 .review-cta { display:inline-flex; align-items:center; gap:12px; padding:8px 12px; background:#98dfe0; color:#103239; font-size:13px; font-weight:700; border-radius:3px; }
 .review-cta:hover { background:#bbf3f4; }
 .feature-dots { display:flex; justify-content:center; padding:4px 0 0; }

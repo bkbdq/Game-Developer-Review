@@ -1,7 +1,6 @@
 ---
 import Layout from '../../../components/Layout.astro';
 import ProjectCover from '../../../components/ProjectCover.astro';
-import ProjectStatus from '../../../components/ProjectStatus.astro';
 import ReviewCard from '../../../components/ReviewCard.astro';
 import RatingDetails from '../../../components/RatingDetails.astro';
 import { projects } from '../../../lib/projects';
@@ -18,7 +17,7 @@ const writeUrl = surveyUrl(p.company,p.name);
   <nav class="project-crumb" aria-label="面包屑"><a href={href()}>项目发现</a> / <a href={href('company/'+p.slug+'/')}>{p.company}</a> / {p.name}</nav>
   <header class="project-mast"><ProjectCover project={p} src={p.detailArt} eager/><div>
     <a class="studio-link" href={href('company/'+p.slug+'/')}>{p.company} ↗</a>
-    <h1>{p.name}</h1><ProjectStatus status={p.statusKey}/>
+    <h1>{p.name}</h1>
     <RatingDetails rating={p}/>
     <a class="review-cta" href={writeUrl}>评价这个项目 <span aria-hidden="true">→</span></a>
   </div></header>

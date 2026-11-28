@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "postbuild": "node --test tests/public-project-status.test.mjs",
     "test:courier": "node --experimental-strip-types --test tests/courier.test.mjs",
     "preview": "astro preview"
   },

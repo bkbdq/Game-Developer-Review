@@ -2,7 +2,6 @@
 import { recentPicks, projects } from '../lib/projects';
 import { href } from '../lib/data';
 import ProjectCover from './ProjectCover.astro';
-import ProjectStatus from './ProjectStatus.astro';
 import CompanyRatingLink from './CompanyRatingLink.astro';
 const slides = (recentPicks.length ? recentPicks : projects).slice(0,10);
 const loops = slides.length > 1;
@@ -26,7 +25,7 @@ const title = recentPicks.length ? '最近收到好评的项目' : '项目聚焦
         <div class="feature-excerpts" aria-label="项目评价摘录">
           {p.featuredReview ? <blockquote><p>{p.featuredReview.comment}</p></blockquote> : <p>暂无公开评价</p>}
         </div>
-        <div class="feature-bottom"><ProjectStatus status={p.statusKey}/><a class="review-cta" href={p.path}>查看全部评价 <b>→</b></a></div>
+        <div class="feature-bottom"><a class="review-cta" href={p.path}>查看全部评价 <b>→</b></a></div>
       </div>
       {loops && <img class="feature-preview-art" src={p.cover ?? href('images/studio.webp')} alt="" loading="lazy" decoding="async"/>}
     </article>)}

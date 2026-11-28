@@ -161,7 +161,7 @@ test('本机同源页面无需登录即可找图和读取缓存，后台凭证�
   assert.equal((await post({},'&key=client-fixture')).status,400);
   assert.equal(calls,0);
   upstreamStatus = 401;
-  assert.equal((await post()).status,502);
+  assert.equal((await post()).status,503);
   upstreamStatus = 200;
   const result = await post();
   assert.equal(result.status,200);

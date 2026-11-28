@@ -11,9 +11,10 @@ const {project:p, inStudio=false, recommended} = Astro.props;
     {p.reviews[0] && <span class="tile-peek"><small>最近评价</small><span>{p.reviews[0].title || p.reviews[0].comment}</span><b>查看全部评价 →</b></span>}
   </span>
   <div class="tile-body">
-    <div class="tile-context">{inStudio ? <small>{p.status}</small> : <CompanyRatingLink project={p}/>}
-      {recommended && <small class="board-status" data-status={p.statusKey}>{p.status}</small>}
-    </div>
+    {(!inStudio || p.status) && <div class="tile-context">
+      {inStudio ? <small>{p.status}</small> : <CompanyRatingLink project={p}/>}
+      {recommended && !inStudio && p.status && <small class="board-status" data-status={p.statusKey}>{p.status}</small>}
+    </div>}
     <div class="tile-title-row"><h3><a class="tile-project-link" href={p.path}>{p.name}</a></h3><ReviewRating rating={p}/></div>
     {recommended && <dl class="board-stats">
       <div><dt>近 30 天好评</dt><dd>{p.recentPositive}<small> 篇</small></dd></div>

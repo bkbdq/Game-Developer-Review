@@ -1,13 +1,14 @@
 ---
-import { statuses } from '../lib/projects';
+import { projectStatusLabel } from '../lib/projects';
 
 interface Props { status: string }
 const { status } = Astro.props;
+const label = projectStatusLabel(status);
 ---
-<span class="project-status" data-status={status}>
-  <span class="status-mark" aria-hidden="true">{status === 'live' ? '✓' : '●'}</span>
-  {statuses[status] ?? statuses.unknown}
-</span>
+{label && <span class="project-status" data-status={status}>
+  <span class="status-mark" aria-hidden="true">●</span>
+  {label}
+</span>}
 
 <style>
   .project-status {
@@ -26,16 +27,6 @@ const { status } = Astro.props;
     white-space:nowrap;
   }
   .status-mark { font-size:12px; line-height:1; }
-  .project-status[data-status="live"] { background:#a5ebae; color:#143921; border-color:#baf5c3; }
-  .project-status[data-status="live"] .status-mark {
-    display:grid;
-    place-items:center;
-    width:15px;
-    height:15px;
-    border-radius:50%;
-    background:#205c39;
-    color:#fff;
-  }
   .project-status[data-status="dev"] { background:#463b26; color:#ffe0a0; border-color:#987e4e; }
   .project-status[data-status="cancelled"] { background:#493139; color:#f2c4c9; border-color:#96717c; }
 </style>

@@ -3,7 +3,10 @@ import { catalogArtwork, defaultArtwork } from './artwork';
 import { compareProjects, isRecentPick, projectStats } from './project-stats';
 
 export const asOf = new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date(index.generatedAt));
-export const statuses: Record<string,string> = {live:'已上线',dev:'在研',cancelled:'已取消',unknown:'状态未知'};
+const statusLabels: Record<string,string> = {live:'',dev:'在研',cancelled:'已取消',unknown:'状态未知'};
+export function projectStatusLabel(status: string) {
+  return statusLabels[status] ?? statusLabels.unknown;
+}
 const studios = index.companies.map(company => {
   const data = detail(company.id);
   return {company, data, rating: projectStats(data.reviews, asOf)};
@@ -20,7 +23,7 @@ export const projects = studios.flatMap(({company:c, data, rating}) => {
     const cover = configured?.cover ?? defaultArtwork;
     const scene = thumb;
     return {
-      id: project.id, name: project.name, statusKey: project.status, status: statuses[project.status] || statuses.unknown,
+      id: project.id, name: project.name, statusKey: project.status, status: projectStatusLabel(project.status),
       company: c.name, companyRating:rating, slug:c.slug, aliases, reviews, featuredReview, cover, thumb, scene,
       hasArtwork: Boolean(configured), detailArt: configured?.detail ?? defaultArtwork, cardArt: thumb,
       path:href(`project/${encodeURIComponent(c.slug)}/${encodeURIComponent(project.id)}/`),

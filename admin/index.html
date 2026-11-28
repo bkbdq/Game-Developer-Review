@@ -9,16 +9,16 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><strong>审核控制台</strong><span id="user-label"></span></div>
-    <div class="topbar-actions">
-      <a id="artwork-link" class="topbar-link" href="/artwork.html" hidden>配图管理</a>
-      <a class="topbar-link" href="/data.html">数据维护</a>
-      <a class="topbar-link" href="/requests.html">申请 / 联系</a>
-      <a class="topbar-link" href="/audit.html">审计日志</a>
-      <button id="logout-button" type="button" class="ghost" hidden>退出</button>
-    </div>
-  </header>
+  <header class="bar"><div class="bar-inner">
+    <a class="brand" href="/">goodcorp</a><span class="divider"></span>
+    <span>审核控制台</span>
+    <a class="topbar-link" href="/data.html">数据维护</a>
+    <a class="topbar-link" href="/requests.html">申请 / 联系</a>
+    <a class="topbar-link" href="/audit.html">审计日志</a>
+    <a id="artwork-link" class="topbar-link" href="/artwork.html" hidden>配图管理</a>
+    <span class="user-slot"><span id="user-label"></span></span>
+    <button id="logout-button" type="button" class="bar-ghost" hidden>退出</button>
+  </div></header>
 
   <main>
     <section id="boot-view" class="panel login boot" aria-live="polite">
@@ -37,7 +37,7 @@
       <form id="login-form">
         <label for="token">GitHub Token</label>
         <input id="token" type="password" autocomplete="off" spellcheck="false" required>
-        <button type="submit">登录</button>
+        <button type="submit" class="primary">登录</button>
       </form>
       <p id="login-status" class="status" role="status"></p>
     </section>
@@ -82,11 +82,11 @@
           </div>
           <div id="staged-bar" class="staged-bar" hidden>
             <span id="staged-summary"></span>
-            <button id="publish-batch-button" type="button">全部发布</button>
+            <button id="publish-batch-button" type="button" class="primary">全部发布</button>
           </div>
           <div id="change-bar" class="staged-bar" hidden>
             <span id="change-summary"></span>
-            <button id="submit-changes-button" type="button">批量提交</button>
+            <button id="submit-changes-button" type="button" class="primary">批量提交</button>
           </div>
           <div id="pending-list"></div>
           <button id="load-more" type="button" class="ghost" hidden>加载更多</button>
@@ -180,7 +180,7 @@
             </fieldset>
 
             <div class="actions">
-              <button id="approve-button" type="submit">通过并发布</button>
+              <button id="approve-button" type="submit" class="primary">通过并发布</button>
               <button id="stage-button" type="button" class="ghost">暂存</button>
               <button id="reject-button" type="button" class="danger">拒绝</button>
             </div>

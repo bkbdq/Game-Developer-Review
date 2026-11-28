@@ -9,16 +9,14 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <a class="topbar-link" href="/">← 审核台</a>
-      <a class="topbar-link" href="/data.html">数据维护</a>
-      <a class="topbar-link" href="/audit.html">审计日志</a>
-      <strong>申请 / 联系队列</strong>
-      <span id="user-label"></span>
-    </div>
-    <button id="logout-button" type="button" class="ghost" hidden>退出</button>
-  </header>
+  <header class="bar"><div class="bar-inner">
+    <a class="brand" href="/">goodcorp</a><span class="divider"></span>
+    <a href="/">审核控制台</a><span class="crumb">/</span><span>申请 / 联系</span>
+    <a class="topbar-link" href="/data.html">数据维护</a>
+    <a class="topbar-link" href="/audit.html">审计日志</a>
+    <span class="user-slot"><span id="user-label"></span></span>
+    <button id="logout-button" type="button" class="bar-ghost" hidden>退出</button>
+  </div></header>
 
   <main>
     <section id="boot-view" class="panel login boot" aria-live="polite">
@@ -37,7 +35,7 @@
       <form id="login-form">
         <label for="token">GitHub Token</label>
         <input id="token" type="password" autocomplete="off" spellcheck="false" required>
-        <button type="submit">登录</button>
+        <button type="submit" class="primary">登录</button>
       </form>
       <p id="login-status" class="status" role="status"></p>
     </section>

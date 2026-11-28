@@ -87,6 +87,11 @@ figcaption small {font:11px/1.4 ui-monospace,monospace}
 [hidden] {display:none!important}
 #batch-review {background:white;border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:14px}
 #batch-items {display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}.proposal,.proposal label {display:flex;align-items:center;gap:6px}
+#stage-review {background:white;border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:14px}
+#stage-items {display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.stage-actions {display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.stage-actions small {font-size:12px;color:var(--muted)}
+.stage-buttons {display:flex;gap:8px}
 .proposal strong,.proposal small {display:block}.proposal small {font-size:11px}
 .proposal {border:1px solid var(--line);padding:4px 6px;border-radius:5px;font-size:12px}.proposal img {width:50px;height:32px;object-fit:contain;background:#e9eff1}.proposal button {padding:3px 6px;font-size:11px}
 @media(max-width:760px){

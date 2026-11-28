@@ -9,19 +9,15 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <a class="topbar-link" href="/">← 审核台</a>
-      <strong>数据维护</strong>
-      <span id="user-label"></span>
-    </div>
-    <div class="topbar-actions">
-      <a id="pending-changes-link" class="topbar-link" href="/?tab=changes">待审改动（0）</a>
-      <a class="topbar-link" href="/requests.html">申请 / 联系</a>
-      <a class="topbar-link" href="/audit.html">审计日志</a>
-      <button id="logout-button" type="button" class="ghost" hidden>退出</button>
-    </div>
-  </header>
+  <header class="bar"><div class="bar-inner">
+    <a class="brand" href="/">goodcorp</a><span class="divider"></span>
+    <a href="/">审核控制台</a><span class="crumb">/</span><span>数据维护</span>
+    <a class="topbar-link" href="/requests.html">申请 / 联系</a>
+    <a class="topbar-link" href="/audit.html">审计日志</a>
+    <a id="pending-changes-link" class="topbar-link" href="/?tab=changes">待审改动（0）</a>
+    <span class="user-slot"><span id="user-label"></span></span>
+    <button id="logout-button" type="button" class="bar-ghost" hidden>退出</button>
+  </div></header>
 
   <main>
     <section id="boot-view" class="panel login boot" aria-live="polite">
@@ -40,7 +36,7 @@
       <form id="login-form">
         <label for="token">GitHub Token</label>
         <input id="token" type="password" autocomplete="off" spellcheck="false" required>
-        <button type="submit">登录</button>
+        <button type="submit" class="primary">登录</button>
       </form>
       <p id="login-status" class="status" role="status"></p>
     </section>
@@ -144,7 +140,7 @@
             </label>
           </div>
           <div class="actions">
-            <button id="new-project-add" type="button">添加</button>
+            <button id="new-project-add" type="button" class="primary">添加</button>
             <button id="new-project-cancel" type="button" class="ghost">取消</button>
           </div>
         </div>
@@ -224,7 +220,7 @@
       </fieldset>
 
       <div class="actions">
-        <button type="submit">保存修改</button>
+        <button type="submit" class="primary">保存修改</button>
         <button id="review-dialog-revert" type="button" class="ghost">还原</button>
         <button id="review-dialog-cancel" type="button" class="ghost">取消</button>
       </div>
@@ -251,7 +247,7 @@
       </label>
 
       <div class="actions">
-        <button type="submit">保存修改</button>
+        <button type="submit" class="primary">保存修改</button>
         <button id="company-dialog-cancel" type="button" class="ghost">取消</button>
         <button id="company-dialog-delete" type="button" class="danger">删除公司</button>
       </div>
@@ -290,7 +286,7 @@
       </label>
 
       <div class="actions">
-        <button type="submit">保存修改</button>
+        <button type="submit" class="primary">保存修改</button>
         <button id="project-dialog-cancel" type="button" class="ghost">取消</button>
       </div>
       <p id="project-dialog-message" class="status" role="status"></p>

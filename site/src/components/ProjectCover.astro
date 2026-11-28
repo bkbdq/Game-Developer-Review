@@ -4,6 +4,6 @@ import { href } from '../lib/data';
 interface Props { project: Project; eager?: boolean; src?: string }
 const { project, eager = false, src = project.cover } = Astro.props;
 ---
-<span class="project-art">
+<span class="project-art" style={{'--art-position':project.artPosition}}>
   <img src={src ?? href('images/studio.webp')} alt="" loading={eager?'eager':'lazy'} decoding="async" fetchpriority={eager?'high':undefined} />
 </span>

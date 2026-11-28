@@ -27,7 +27,7 @@ const title = recentPicks.length ? '最近收到好评的项目' : '项目聚焦
         </div>
         <div class="feature-bottom"><a class="review-cta" href={p.path}>查看全部评价 <b>→</b></a></div>
       </div>
-      {loops && <img class="feature-preview-art" src={p.cover ?? href('images/studio.webp')} alt="" loading="lazy" decoding="async"/>}
+      {loops && <img class="feature-preview-art" src={p.cover ?? href('images/studio.webp')} style={{objectPosition:p.artPosition}} alt="" loading="lazy" decoding="async"/>}
     </article>)}
     </div>
     {loops && <>

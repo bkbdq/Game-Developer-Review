@@ -12,7 +12,8 @@ async function sharedSources(query, token) {
   for (const alias of query.aliases) params.append('alias',alias);
   for (const work of query.works) params.append('work',work);
   const response = await fetch('https://admin.goodcorp.games/api/admin/artwork-search?' + params, {
-    method:'POST', redirect:'error', signal:AbortSignal.timeout(85000),
+    // 云端要等 DeepSeek 联网搜索完成，可能超过两分钟，本机超时略高于云端。
+    method:'POST', redirect:'error', signal:AbortSignal.timeout(135000),
     headers:{Authorization:'Bearer ' + token},
   });
   const result = await response.json().catch(() => null);

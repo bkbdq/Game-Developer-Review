@@ -59,7 +59,7 @@ test('DS 直接返回可提交的图片，跳过无法读取的网页，并从�
   const photo=result.candidates[0];
   assert.equal(photo.provider,'DeepSeek');assert.equal(photo.page,page);
   const packed=await createArtworkLibrary(tmpdir()).prepare({...photo,company:'c_demo',target:'p_demo',x:50,y:50,mode:'cover'},Buffer.from(photo.webp,'base64'));
-  assert.ok(packed.files.cover);assert.equal(packed.saved.image,photo.image);
+  assert.ok(packed.files.cover);assert.ok(packed.source);assert.ok(!packed.files.source);assert.equal(packed.saved.image,photo.image);
   assert.equal(webUrl('https://127.0.0.1/'),null);
   assert.equal(webUrl('https://name:pass@example.org/'),null);
 });
@@ -222,12 +222,14 @@ test('R2 配图接口在存储未绑定或上传不完整时拒绝提交', async
   assert.equal((await uploadArtwork({env,params:{path},request:post()})).status,503);
   env.ARTWORK = {put:() => assert.fail('无效请求不应写入任何图片')};
   assert.equal((await uploadArtwork({env,params:{path},request:post()})).status,400);
-  for (const name of ['source','card','banner']) form.append(name,new Blob(['invalid'],{type:'image/webp'}),name+'.webp');
+  for (const name of ['card','banner']) form.append(name,new Blob(['invalid'],{type:'image/webp'}),name+'.webp');
   assert.equal((await uploadArtwork({env,params:{path},request:post()})).status,400);
+  form.append('source',new Blob(['invalid'],{type:'image/webp'}),'source.webp');
+  assert.equal((await uploadArtwork({env,params:{path},request:post()})).status,400,'多余的 source 档必须被拒绝');
   assert.equal((await readArtwork({env,params:{},request:new Request(url)})).status,404);
 });
 
-test('提交将原图和展示图写入对象存储，仓库只更新记录，支持重试与冲突检测', async t => {
+test('提交将展示图写入对象存储，仓库只更新记录，支持重试与冲突检测', async t => {
   const root = await mkdtemp(join(tmpdir(), 'goodcorp-artwork-'));
   t.after(() => rm(root, {recursive:true,force:true}));
   await mkdir(join(root, 'data/companies'), {recursive:true});
@@ -255,6 +257,7 @@ test('提交将原图和展示图写入对象存储，仓库只更新记录，�
   };
   const objects = new Map();
   const network = async url => {
+    if (url.startsWith('/api/local/artwork/image')) return new Response(bytes,{headers:{'content-type':'image/png'}});
     if (url.startsWith('/api/artwork/')) return new Response(objects.get(url),{headers:{'content-type':'image/webp'}});
     if (url.includes('git/trees/')) return Response.json({tree:[...paths].map(([path,sha])=>({type:'blob',path,sha}))});
     return new Response(blobs.get(url.split('/').pop()));
@@ -263,7 +266,8 @@ test('提交将原图和展示图写入对象存储，仓库只更新记录，�
   assert.ok(items.every(item => !item.thumbnail && !item.remoteSha));
   const config = {owner:'org',publicRepo:'repo',publicBranch:'main'};
   let x = 75;
-  const prepare = item => lib.prepare({...item,title:item.name,provider:'本机图片',page:'',mode:'cover',x,y:50},bytes);
+  const prepare = item => lib.prepare({...item,title:item.name,provider:'DeepSeek',page:'https://fixture.example/page',
+    image:'https://fixture.example/original.png',mode:'cover',x,y:50},bytes);
   let failUpload = false;
   const upload = async (item,version,files) => {
     for (const [key,encoded] of Object.entries(files)) {
@@ -276,6 +280,7 @@ test('提交将原图和展示图写入对象存储，仓库只更新记录，�
   const result = await submit(items);
   assert.equal(updates,1);
   assert.equal(result.records.length,2);
+  assert.ok(![...objects.keys()].some(key => key.endsWith('/source.webp')),'原图不应写入对象存储');
   assert.deepEqual(await readdir(root),['data']);
   const reopened = await readArtworkRepository([],null,network);
   assert.equal(reopened.rows.length,2);
@@ -284,7 +289,8 @@ test('提交将原图和展示图写入对象存储，仓库只更新记录，�
     assert.ok(entry.thumbnail.endsWith('/' + entry.company + '/' + entry.target + '/' + saved.version + '/card.webp'));
     assert.equal(saved.storage,'r2');
     assert.equal(saved.x,75);
-    assert.equal((await sharp(Buffer.from(await file.arrayBuffer())).metadata()).format,'webp');
+    assert.equal(saved.image,'https://fixture.example/original.png');
+    assert.equal((await sharp(Buffer.from(await file.arrayBuffer())).metadata()).format,'png');
     for (const spec of sizes[entry.kind]) {
       const path = '/api/artwork/' + [entry.company,entry.target,saved.version,spec.key + '.webp'].join('/');
       const meta = await sharp(objects.get(path)).metadata();
@@ -314,13 +320,13 @@ test('提交将原图和展示图写入对象存储，仓库只更新记录，�
   const stem = 'site/public/images/catalog/' + entry.company + '/' + entry.target + '/';
   const legacy = await prepare(entry);
   paths.set(stem + 'current.json',(await client.createBlob(null,null,JSON.stringify(legacy.saved))).sha);
-  for (const name of ['source','card']) paths.set(stem + legacy.saved.version + '-' + name + '.webp',
-    (await client.createBlob(null,null,legacy.files[name],'base64')).sha);
+  paths.set(stem + legacy.saved.version + '-source.webp',(await client.createBlob(null,null,legacy.source,'base64')).sha);
+  paths.set(stem + legacy.saved.version + '-card.webp',(await client.createBlob(null,null,legacy.files.card,'base64')).sha);
   const mixed = await readArtworkRepository([],null,network);
   const old = mixed.rows.find(row=>row.target===entry.target);
   assert.ok(old.thumbnail.endsWith(legacy.saved.version + '-card.webp'));
   const original = await mixed.original(old);
-  assert.deepEqual(Buffer.from(await original.file.arrayBuffer()),Buffer.from(legacy.files.source,'base64'));
+  assert.deepEqual(Buffer.from(await original.file.arrayBuffer()),Buffer.from(legacy.source,'base64'));
   assert.equal((await submit([old])).records[0].saved.storage,'r2');
 });
 

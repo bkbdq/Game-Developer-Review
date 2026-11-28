@@ -21,6 +21,17 @@ async function request(path, options) {
 let entries = [], active, status = 'all', batch, repository;
 let publishing = false;
 const proposed = new Set(), checked = new Set();
+const STAGE_KEY = 'goodcorp-artwork-staging';
+function loadStage() {
+  try {
+    const map = JSON.parse(localStorage.getItem(STAGE_KEY) || '{}');
+    return map && typeof map === 'object' && !Array.isArray(map) ? map : {};
+  } catch { return {}; }
+}
+function saveStage(map) {
+  try { localStorage.setItem(STAGE_KEY, JSON.stringify(map)); }
+  catch { /* 本机暂存写不进时不阻塞浏览 */ }
+}
 function matchingEntries() {
   const kind = $('kind').value;
   const query = $('filter').value.trim().normalize('NFKC').toLocaleLowerCase();
@@ -58,6 +69,7 @@ function directory() {
     btn.disabled = !repository && key !== 'all';
   }
   $('targets').replaceChildren(...list.map(e => {
+    const staged = Boolean(loadStage()[e.company + '/' + e.target]);
     const thumbnail = h('span', {class:'thumbnail', 'aria-hidden':'true'}, e.kind === 'company' ? '企' : '项');
     if (e.thumbnail) thumbnail.append(h('img', {src:e.thumbnail, alt:'', loading:'lazy', referrerPolicy:'no-referrer', onerror:ev=>ev.target.remove()}));
     const link = h('a', {href:viewUrl(e), class:'manage-link', 'aria-label':(e.remoteSha ? '编辑配图：' : '配置图片：') + e.name,
@@ -65,7 +77,8 @@ function directory() {
       e.remoteSha ? '编辑配图' : e.changed ? '继续配图' : '配置图片');
     return h('tr', {}, h('th', {scope:'row'}, h('div', {class:'identity'}, thumbnail, h('span', {}, h('strong', {}, e.name),
       h('small', {}, e.kind === 'company' ? '公司' : '项目 · ' + e.studio)))),
-      h('td', {}, h('span', {class:'status' + (e.remoteSha ? ' ready' : '')}, e.remoteSha && e.changed ? '已配图 · 待提交' : stateText(e))),
+      h('td', {}, h('span', {class:'status' + (e.remoteSha ? ' ready' : '')},
+        e.remoteSha && e.changed ? '已配图 · 待提交' : staged && !e.changed ? (e.remoteSha ? '已配图 · 已暂存' : '已暂存') : stateText(e))),
       h('td', {}, link));
   }));
   $('count').textContent = '显示 ' + list.length + ' / ' + entries.length + ' 项';
@@ -104,9 +117,12 @@ function draw() {
   $('x').disabled = $('y').disabled = e.mode === 'contain' || e.saving;
   $('save').disabled = !e.pick || !e.changed || publishing || !e.loaded;
   $('save').textContent = e.remoteSha ? '保存配图修改' : '提交配图';
+  $('stage').hidden = !e.pick || !e.loaded;
+  $('stage').disabled = e.saving || publishing || !e.pick?.image;
+  $('stage').title = e.pick?.image ? '保存到本机暂存区，稍后在配图管理批量上传' : '这张图没有出处地址（本机图片），无法暂存，请直接提交';
   $('discard').hidden = !e.current || !e.changed;
   $('discard').disabled = e.saving;
-  $('message').textContent = e.message || '确认后将原图和展示图保存到 Cloudflare R2。';
+  $('message').textContent = e.message || '确认后将展示图保存到 Cloudflare R2，原图不进存储桶。';
   $('source').replaceChildren();
   if (e.pick) {
     $('source').append(e.pick.provider + ' · ' + e.pick.title);
@@ -133,6 +149,7 @@ function refresh(e) {
   directory();
   if (e === active) draw();
   batchReview();
+  stageReview();
 }
 
 function choose(e, candidate, existing = '') {
@@ -217,7 +234,7 @@ $('legacy').onclick = () => openDraft(active);
 $('discard').onclick = () => choose(active, active.current, 'remote');
 
 async function openRemote(e) {
-  e.loading = true; e.message = '正在读取已保存的原图…'; refresh(e);
+  e.loading = true; e.message = '正在按记录的出处读取原图…'; refresh(e);
   try {
     const {saved,file} = await repository.original(e);
     e.saved = saved;
@@ -419,7 +436,7 @@ function askForToken() {
   });
 }
 
-async function publish(items, report) {
+async function publish(items, report, onDone) {
   if (publishing || !items.length) return;
   publishing = true;
   items.forEach(e => { e.saving = true; });
@@ -434,11 +451,11 @@ async function publish(items, report) {
       throw err;
     }
     setToken(token);
-    report('正在将原图和展示图保存到 Cloudflare R2…');
+    report('正在将展示图保存到 Cloudflare R2…');
     const previews = new Map();
     const result = await publishArtwork({client:createClient(token), config, items, upload:(...args)=>uploadArtwork(token,...args), prepare:async e => {
       const prepared = await prepare(e);
-      previews.set(e, {source:webpFile(prepared.files.source), card:webpFile(prepared.files.card)});
+      previews.set(e, {source:webpFile(prepared.source), card:webpFile(prepared.files.card)});
       return prepared;
     }});
     items.forEach((e,i) => {
@@ -455,11 +472,12 @@ async function publish(items, report) {
       checked.delete(e); proposed.delete(e);
     });
     report(result.message);
+    if (onDone) onDone(result);
   } catch (err) { report('提交失败 · ' + err.message + '。当前选图仍在页面中。'); }
   finally {
     publishing = false;
     items.forEach(e => { e.saving = false; });
-    directory(); draw(); batchReview();
+    directory(); draw(); batchReview(); stageReview();
   }
 }
 $('save').onclick = () => {
@@ -487,6 +505,65 @@ $('batch-save').onclick = () => {
   $('batch-status').hidden = false;
   void publish(list, msg => { $('batch-status').textContent = msg; });
 };
+
+function stageReview() {
+  const map = loadStage();
+  const items = Object.entries(map);
+  $('stage-review').hidden = !items.length;
+  $('stage-items').replaceChildren(...items.map(([key, s]) => h('div', {class:'proposal'},
+    h('img', {src:api('image', {url:s.image}), alt:'', referrerPolicy:'no-referrer'}),
+    h('span', {}, h('strong', {}, s.name), h('small', {}, s.provider + ' · ' + s.title)),
+    h('button', {type:'button', 'aria-label':'移除暂存：' + s.name, onclick:() => {
+      const rest = loadStage(); delete rest[key]; saveStage(rest);
+      stageReview(); directory();
+    }}, '移除'))));
+  $('stage-upload').textContent = '批量上传暂存（' + items.length + '）';
+  $('stage-upload').disabled = publishing || !items.length || !repository;
+  $('stage-clear').disabled = publishing || !items.length;
+}
+$('stage-clear').onclick = () => {
+  if (publishing) return;
+  saveStage({});
+  stageReview(); directory();
+};
+$('stage-upload').onclick = () => {
+  if (publishing || !repository) return;
+  const map = loadStage();
+  const items = [], skipped = [];
+  for (const s of Object.values(map)) {
+    const e = entries.find(row => row.company === s.company && row.target === s.target);
+    if (!e || e.saving) { skipped.push(s.name); continue; }
+    e.pick = {provider:s.provider, title:s.title, page:s.page, image:s.image};
+    e.mode = s.mode; e.x = Number(s.x); e.y = Number(s.y);
+    e.changed = true; e.loaded = false; e.message = '';
+    items.push(e);
+  }
+  $('batch-status').hidden = false;
+  if (!items.length) {
+    $('batch-status').textContent = skipped.length ? '暂存条目已不在当前目录中，请在暂存区移除后重试。' : '';
+    return;
+  }
+  const keys = items.map(e => e.company + '/' + e.target);
+  void publish(items, msg => { $('batch-status').textContent = msg; }, () => {
+    const rest = loadStage();
+    for (const key of keys) delete rest[key];
+    saveStage(rest);
+    stageReview(); directory();
+    if (skipped.length) $('batch-status').textContent += '（另有 ' + skipped.length + ' 项未找到对应条目，仍保留在暂存区）';
+  });
+};
+$('stage').onclick = () => {
+  const e = active;
+  if (!e || !e.pick?.image || e.saving || publishing) return;
+  const map = loadStage();
+  map[e.company + '/' + e.target] = {company:e.company, target:e.target, name:e.name, kind:e.kind, studio:e.studio,
+    mode:e.mode, x:e.x, y:e.y, provider:e.pick.provider, title:e.pick.title || e.name,
+    page:e.pick.page || '', image:e.pick.image, at:Date.now()};
+  saveStage(map);
+  e.message = '已暂存到本机浏览器，回到配图管理可批量上传。';
+  if (active === e) $('message').textContent = e.message;
+  directory(); batchReview(); stageReview();
+};
 try {
   let data = await (await request(api('catalog'))).json();
   try {
@@ -499,6 +576,7 @@ try {
   entries = data.map(e => ({ ...e, draft:e.draft?.storage === 'r2' ? null : e.draft, remoteSha:e.remoteSha ?? null, term:e.name, candidates:[], ticket:0,
     x:50, y:50, mode:e.kind === 'company' ? 'contain' : 'cover' }));
   followLocation();
+  stageReview();
 } catch (err) {
   $('repo-status').textContent = '无法读取目录。请从项目的 start-artwork.cmd 启动工具。' + err.message;
 }

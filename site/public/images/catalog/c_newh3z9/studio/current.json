@@ -7,5 +7,6 @@
   "page": "https://www.maigoo.com/brand/91388.html",
   "provider": "公司标志",
   "image": "https://image.maigoo.com/upload/images/20210618/18144655046_207x90.gif",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 1.3
 }

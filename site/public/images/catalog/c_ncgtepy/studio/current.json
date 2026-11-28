@@ -7,5 +7,6 @@
   "page": "https://www.shixiseng.com/com/com_egukakecs5pw",
   "provider": "公司标志",
   "image": "https://sxsimg.xiaoyuanzhao.com/3A/5A/3AE5A52D2C0F1455960A1450DE3CDB5A.png",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 3
 }

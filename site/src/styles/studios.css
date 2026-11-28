@@ -54,8 +54,9 @@
 .studio-grid .studio-tile:hover,.studio-grid .studio-tile:focus-visible { border-color:#79a9b8; transform:translateY(-2px); }
 .studio-tile-art { position:relative; height:98px; background:linear-gradient(120deg,#315667,#385166 55%,#456575); }
 .studio-tile-art img { display:block; width:100%; height:100%; object-fit:cover; object-position:center 45%; }
-.studio-tile-art img.company-logo, .studio-panorama.company-logo { object-fit:contain; background:#e9eff1; object-position:center; }
-.studio-art-source { position:absolute; z-index:1; left:8px; bottom:6px; padding:2px 6px; border-radius:3px; background:#102531e8; color:#ebf1f4; font-size:11px; }
+.mark-logo { overflow:hidden; padding:3px; background:#e9eff1; }
+.mark-logo img { display:block; min-width:0; min-height:0; width:100%; height:100%; object-fit:contain; }
+.studio-art-source { position:absolute; z-index:1; right:8px; bottom:6px; max-width:calc(100% - 82px); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; padding:2px 6px; border-radius:3px; background:#102531e8; color:#ebf1f4; font-size:11px; }
 .studio-tile-art::after { content:''; position:absolute; inset:0; background:linear-gradient(0deg,#162b3ac9,transparent 56%); }
 .studio-tile-score { position:absolute; top:9px; right:9px; z-index:1; border-radius:4px; border:1px solid #c5d7dc52; padding:5px 9px; background:#10222ff2; }
 .studio-tile-body { padding:0 15px 10px; }

@@ -92,8 +92,7 @@ const visible = () => matchingEntries().filter(matchesStatus);
 const imageUrl = c => c.local || api('image', { url: c.image });
 function fallbackText(e) {
   if (e.kind === 'project') return '显示默认项目图';
-  const pictured = entries.some(row => row.company === e.company && row.kind === 'project' && row.remoteSha);
-  return pictured ? '待配 Logo · 显示旗下项目图' : '待配 Logo · 显示默认图';
+  return '待配 Logo · 显示默认图标';
 }
 const stateText = e => e.saving ? '提交中' : e.changed ? '待提交' : e.remoteSha ? '已配图' : e.draft ? '本机草稿' : repository ? fallbackText(e) : '未同步';
 
@@ -127,7 +126,7 @@ function directory() {
       if (!stagedThumbs.has(skey)) stagedThumbs.set(skey, URL.createObjectURL(webpFile(loadStage()[skey].files.card)));
       thumb = stagedThumbs.get(skey);
     }
-    const thumbnail = h('span', {class:'thumbnail', 'aria-hidden':'true'}, e.kind === 'company' ? '企' : '项');
+    const thumbnail = h('span', {class:e.kind === 'company' ? 'thumbnail logo-thumb' : 'thumbnail', 'aria-hidden':'true'}, e.kind === 'company' ? '企' : '项');
     if (thumb) thumbnail.append(h('img', {src:thumb, alt:'', loading:'lazy', referrerPolicy:'no-referrer', onerror:ev=>ev.target.remove()}));
     const link = h('a', {href:viewUrl(e), class:'manage-link', 'aria-label':(e.remoteSha ? '编辑配图：' : staged ? '继续编辑：' : '配置图片：') + e.name,
       onclick:ev => { if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return; ev.preventDefault(); openEntry(e); }},
@@ -148,7 +147,7 @@ function draw() {
   const e = active;
   if (!e) return;
   $('name').textContent = e.name;
-  $('context').textContent = e.kind === 'project' ? e.studio + ' / 项目' : '公司';
+  $('context').textContent = e.kind === 'project' ? e.studio + ' / 项目' : '公司 Logo';
   $('state').textContent = stateText(e);
   $('query').value = e.term;
   $('search-sources').textContent = e.kind === 'company' ? '图片来源：已核实的公司标志、Steam 开发者主页、百度百科、维基共享资源、英文维基百科' : '图片来源：Steam、TapTap、腾讯应用宝、百度百科、英文维基百科';

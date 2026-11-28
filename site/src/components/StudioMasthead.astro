@@ -7,13 +7,13 @@ interface Props { company: Company }
 const { company } = Astro.props;
 const titles = projectsByStudio.get(company.slug) ?? [];
 const custom = catalogArtwork(company.id);
-const featured = !custom && titles.find(p => p.hasArtwork);
-const banner = custom?.banner || (featured && featured.cover) || defaultArtwork;
+const featured = titles.find(p => p.hasArtwork);
+const banner = featured?.cover ?? defaultArtwork;
 ---
 <header class="studio-mast">
-  <img class:list={["studio-panorama", { "company-logo": custom?.banner }]} src={banner} alt="" fetchpriority="high" />
+  <img class="studio-panorama" src={banner} alt="" fetchpriority="high" />
   <div class="studio-identity">
-    <div class="studio-name"><Mark slug={company.slug}/><div>
+    <div class="studio-name"><Mark slug={company.slug} src={custom?.logo} scale={custom?.logoScale}/><div>
       <h1>{company.name}</h1>
     </div></div>
     <div class="studio-metrics"><span><b>{titles.length}</b> 个项目</span><span><b>{company.reviewCount}</b> 篇评价</span></div>

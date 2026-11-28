@@ -7,5 +7,6 @@
   "page": "https://joinbytedance.com/blog/detail/6916465065143961870",
   "provider": "公司标志",
   "image": "https://cdn.sanity.io/images/sq5fussn/production/25e7bd32b6e8b3db70fce5c555b187a5dc9d809a-580x100.png?auto=format&fit=max&w=384",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 1.01
 }

@@ -7,5 +7,6 @@
   "page": "https://www.nvsgames.cn/",
   "provider": "公司标志",
   "image": "https://p1.dailygn.com/obj/g-marketing-act-assets/resource/refactor_template-v1.0.0/1785914967957/pc/cdn/img/logo.png",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 1.01
 }

@@ -7,5 +7,6 @@
   "page": "https://www.kchuhai.com/company/view-6410.html",
   "provider": "公司标志",
   "image": "https://img1.kchuhai.com/merch/20210521/logo20210521141338.jpg",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 3
 }

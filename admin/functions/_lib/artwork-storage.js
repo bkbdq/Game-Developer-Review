@@ -26,9 +26,11 @@ export async function uploadArtwork({request, env, params}) {
     }}));
     form = await new Response(bounded,{headers:request.headers}).formData();
   } catch { return received > limit ? fail(413,'配图超过 24 MB') : fail(400,'无法读取配图文件'); }
-  if ([...form.keys()].length !== dir.names.length) return fail(400,'配图文件不完整');
+  // Existing clients and staged drafts can still upload their original two company renditions.
+  const names = params.path[1] === 'studio' && form.has('banner') ? [...dir.names, 'banner'] : dir.names;
+  if ([...form.keys()].length !== names.length) return fail(400,'配图文件不完整');
   const files = [];
-  for (const name of dir.names) {
+  for (const name of names) {
     const file = form.get(name);
     if (!file || typeof file === 'string' || file.type !== 'image/webp' || file.size < 16 || file.size > 12 * 1024 * 1024) return fail(400,'需要有效的 WebP 图片');
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -49,7 +51,8 @@ export async function uploadArtwork({request, env, params}) {
 export async function readArtwork({env,params,request}) {
   const dir = location(params.path);
   const name = params.path?.[3];
-  if (!dir || params.path.length !== 4 || !dir.names.some(k => name === k + '.webp')) return fail(404,'图片不存在');
+  const legacyBanner = params.path?.[1] === 'studio' && name === 'banner.webp';
+  if (!dir || params.path.length !== 4 || !(legacyBanner || dir.names.some(k => name === k + '.webp'))) return fail(404,'图片不存在');
   if (!env.ARTWORK) return fail(503,'审核后台尚未绑定配图 R2 存储桶');
   const key = dir.prefix + name;
   const head = request.method === 'HEAD';

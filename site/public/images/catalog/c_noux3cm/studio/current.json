@@ -7,5 +7,6 @@
   "page": "https://www.h3d.com.cn/",
   "provider": "公司标志",
   "image": "https://28492248.s21i.faiusr.com/4/ABUIABAEGAAg5_iqqAYokL_msAYwtAI4mgE.png.webp",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 1.49
 }

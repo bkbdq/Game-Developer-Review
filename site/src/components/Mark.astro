@@ -1,5 +1,6 @@
 ---
-const { slug = 'brand' } = Astro.props;
+interface Props { slug?: string; src?: string; scale?: number; lazy?: boolean }
+const { slug = 'brand', src, scale = 1, lazy = false } = Astro.props;
 const glyphs: Record<string, string[]> = {
   brand: ['000000000000','000110011000','001111111100','011011110110','111001101111','111011110011','111111111111','111100001111','011000000110','000000000000'],
   cloudcape: ['0000000000','0000000100','0001000000','0011100100','0111111110','0110111110','1100011011','1111111111','0000000000','0000000000'],
@@ -16,6 +17,6 @@ const glyphs: Record<string, string[]> = {
 const pattern = glyphs[slug] || glyphs.sandisle;
 const dots = pattern.flatMap((row,y) => [...row].flatMap((bit,x) => bit === '1' ? [`${x}em ${y}em currentColor`] : []));
 ---
-<span class:list={['mark', 'mark-' + (Object.hasOwn(glyphs,slug) ? slug : 'sandisle')]} aria-hidden="true">
-  <i style={`width:${pattern[0].length}em;height:${pattern.length}em`}><b style={{boxShadow:dots.join(',')}}></b></i>
+<span class:list={['mark', src ? 'mark-logo' : 'mark-' + (Object.hasOwn(glyphs,slug) ? slug : 'sandisle')]} aria-hidden="true">
+  {src ? <img src={src} alt="" loading={lazy ? 'lazy' : 'eager'} decoding="async" style={{ transform: 'scale(' + scale + ')' }}/> : <i style={`width:${pattern[0].length}em;height:${pattern.length}em`}><b style={{boxShadow:dots.join(',')}}></b></i>}
 </span>

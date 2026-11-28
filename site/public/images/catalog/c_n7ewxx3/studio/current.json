@@ -7,5 +7,6 @@
   "page": "https://www.gamesci.cn/",
   "provider": "公司标志",
   "image": "https://gamesci.cn/assets/main_text-J064qwgB.png",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 3
 }

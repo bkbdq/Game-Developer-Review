@@ -7,5 +7,6 @@
   "page": "https://www.yalla.com.cn/",
   "provider": "公司标志",
   "image": "https://www.yalla.com.cn/img/logo.png",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 1.04
 }

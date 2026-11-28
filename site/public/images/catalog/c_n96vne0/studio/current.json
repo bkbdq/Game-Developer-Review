@@ -7,5 +7,6 @@
   "page": "https://www.taptap.cn/developer/5624",
   "provider": "公司标志",
   "image": "https://img-tc.tapimg.com/market/images/822c110761d0b2a46388d674aa6545f0.png/_tap_avatar.jpg",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 2.97
 }

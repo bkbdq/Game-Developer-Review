@@ -7,5 +7,6 @@
   "page": "https://www.novaserene.com/",
   "provider": "公司标志",
   "image": "https://novaserene.com/public/upload/90/63ba22580066190e410ae09e1b05d7.png",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 1.65
 }

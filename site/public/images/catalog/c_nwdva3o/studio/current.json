@@ -7,5 +7,6 @@
   "page": "https://www.nexarda.com/studios/youthcat-studio-(1235)",
   "provider": "DeepSeek",
   "image": "https://imgcdn1.nexarda.com/uploads/-/2021/1625506615-463d15567097a66926fe644efc891a0fd63da0a7885807005f06786599df7114.png",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 3
 }

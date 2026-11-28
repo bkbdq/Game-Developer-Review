@@ -415,3 +415,29 @@ test('中文百科改用百度词条主图，未配置或接口失败时保留�
   assert.ok(!hosts.includes('zh.wikipedia.org'));
   assert.equal(calls, 2);
 });
+
+test('公司方形 Logo 单档可上传，历史双档仍可上传和读取', async t => {
+  const path = ['c_test','studio','1234567890abcdef'];
+  const url = 'https://admin.example/api/admin/artwork/' + path.join('/');
+  t.mock.method(globalThis,'fetch',async address => Response.json(
+    new URL(address).pathname === '/user' ? {login:'reviewer'} : {permissions:{push:true}}
+  ));
+  const stored = new Map();
+  const env = {GITHUB_OWNER:'org',GITHUB_REPO:'repo',ARTWORK:{
+    put(key,bytes) { stored.set(key,{body:bytes,size:bytes.length}); return {}; },
+    get(key) { return stored.get(key); },
+  }};
+  const image = await sharp({create:{width:256,height:256,channels:3,background:'#123456'}}).webp().toBuffer();
+  const form = new FormData();
+  const file = new Blob([image],{type:'image/webp'});
+  const post = () => uploadArtwork({env,params:{path},request:new Request(url,{method:'POST',headers:{Authorization:'Bearer test'},body:form})});
+  form.append('card',file,'card.webp');
+  assert.equal((await post()).status,200);
+  form.append('banner',file,'banner.webp');
+  assert.equal((await post()).status,200);
+  for (const name of ['card.webp','banner.webp']) {
+    const response = await readArtwork({env,params:{path:[...path,name]},request:new Request(url)});
+    assert.equal(response.status,200);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()),image);
+  }
+});

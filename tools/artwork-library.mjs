@@ -59,7 +59,10 @@ export function createArtworkLibrary(root, { deepSeekKey = process.env.DEEPSEEK_
     const image = options.image || '';
     if (image && (!image.startsWith('https://') || image.length > 2048)) throw error('图片地址无效');
     const settings = { mode, x, y, title, page, provider, image };
-    const version = createHash('sha256').update(data).update(JSON.stringify(settings)).digest('hex').slice(0,16);
+    const hash = createHash('sha256').update(data).update(JSON.stringify(settings));
+    // Square logos must not collide with an immutable legacy landscape card of the same original.
+    if (target === 'studio') hash.update('company-logo-256');
+    const version = hash.digest('hex').slice(0,16);
     const saved = { version, ...settings };
     const formats = sizes[target === 'studio' ? 'company' : 'project'];
     const files = {};

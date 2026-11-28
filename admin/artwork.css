@@ -65,6 +65,9 @@ small {font-size:12px;color:var(--muted);font-weight:500}
 .preview-head {margin:18px 0 10px}.file {position:relative;color:var(--accent);font-size:12px;padding:4px 9px}
 .file input {width:1px;height:1px;position:absolute;opacity:0}
 #previews {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.thumbnail.logo-thumb {width:36px;aspect-ratio:1}
+.thumbnail.logo-thumb img {object-fit:contain}
+#previews:has(figure:only-child) {grid-template-columns:minmax(0,180px)}
 #previews:has(figure:nth-child(3)) {grid-template-columns:minmax(0,1.65fr) minmax(0,1fr)}
 #previews:has(figure:nth-child(3)) figure:first-child {grid-row:span 2;align-self:center}
 figure {margin:0;min-width:0}

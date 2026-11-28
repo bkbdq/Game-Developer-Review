@@ -11,9 +11,9 @@ import { href, index, companyAliases, scoreText, month } from '../lib/data';
 const sorted = index.companies.map(c => {
   const titles = projectsByStudio.get(c.slug) ?? [];
   const art = catalogArtwork(c.id);
-  const picturedProject = !art && titles.find(p => p.hasArtwork);
+  const picturedProject = titles.find(p => p.hasArtwork);
   return {
-    ...c, aliases: companyAliases(c.id), art, titles, picturedProject, card:art?.card || (picturedProject && picturedProject.thumb) || defaultArtwork,
+    ...c, aliases: companyAliases(c.id), art, titles, picturedProject, card:picturedProject?.thumb ?? defaultArtwork,
     rating: companyRatings.get(c.id)!,
     mean: c.reviewCount ? Object.entries(c.scoreDistribution).reduce((sum,[score,count])=>sum + Number(score)*count,0) / c.reviewCount : -1,
   };
@@ -40,7 +40,7 @@ const awards = [
     {awards.map(({title,winner,rule,empty,cover,metric,detail})=><article class="studio-award">
       {cover && <img src={cover} alt="" decoding="async" />}
       <div class="award-content"><h2>{winner && <span class="award-rank" lang="en">No.1</span>}{title}</h2><small>{rule}</small>
-        {winner ? <><a class="award-winner" href={href('company/'+winner.slug+'/')}><Mark slug={winner.slug}/><strong>{winner.name}</strong><span aria-hidden="true">↗</span></a>
+        {winner ? <><a class="award-winner" href={href('company/'+winner.slug+'/')}><Mark slug={winner.slug} src={winner.art?.logo} scale={winner.art?.logoScale}/><strong>{winner.name}</strong><span aria-hidden="true">↗</span></a>
           <p><b>{metric}</b> · {detail}</p></> : <p>{empty} · <a class="award-empty-link" href={surveyUrl()}>写评价</a></p>}
       </div>
     </article>)}
@@ -52,12 +52,12 @@ const awards = [
     <div class="studio-grid" id="companies">
       {sorted.map(c=><a class="company-card studio-tile" href={href('company/' + c.slug + '/')}
         data-name={[c.name,c.slug,...c.aliases].join(' ').normalize('NFKC').toLocaleLowerCase()} data-count={c.reviewCount} data-updated={updatedOrder.get(c.id)}>
-        <div class="studio-tile-art"><img class:list={[{ "company-logo": c.art?.card }]} loading="lazy" decoding="async" src={c.card} alt=""/>
+        <div class="studio-tile-art"><img loading="lazy" decoding="async" src={c.card} alt=""/>
           {c.picturedProject && <small class="studio-art-source">旗下项目 · {c.picturedProject.name}</small>}
           <span class="studio-tile-score"><ReviewRating rating={c.rating}/></span>
         </div>
         <div class="studio-tile-body">
-          <div class="studio-tile-name"><Mark slug={c.slug}/><div><h3>{c.name}</h3></div></div>
+          <div class="studio-tile-name"><Mark slug={c.slug} src={c.art?.logo} scale={c.art?.logoScale} lazy/><div><h3>{c.name}</h3></div></div>
           <p class="studio-tile-numbers">{c.projectCount} 个项目 · {c.reviewCount} 篇评价 · 综合分 {scoreText(c.avgScore)}{c.avgScore!=null && ' / 5'}</p>
           <p class="studio-tile-updated">最近更新 {month(c.lastPublishedAt)}</p>
           <div class="studio-tile-foot"><div class="chips" aria-label="旗下项目">{c.titles.length ? c.titles.map(p=><span>{p.name}</span>) : <small>暂无收录项目</small>}</div><span aria-hidden="true">↗</span></div>

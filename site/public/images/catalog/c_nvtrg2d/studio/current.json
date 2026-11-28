@@ -7,5 +7,6 @@
   "page": "https://www.baike.com/wikiid/7106347152549385508",
   "provider": "公司标志",
   "image": "https://p3-sdbk2-media.byteimg.com/tos-cn-i-xv4ileqgde/5ef9167a1fce4517925fa176d2d52c8d~tplv-xv4ileqgde-image.image",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 3
 }

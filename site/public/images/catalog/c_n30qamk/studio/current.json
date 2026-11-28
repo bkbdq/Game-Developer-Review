@@ -7,5 +7,6 @@
   "page": "https://www.happyelements.com/",
   "provider": "公司标志",
   "image": "https://s.happyelements.com/assets/logo-t1XneLlS.gif",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 1.59
 }

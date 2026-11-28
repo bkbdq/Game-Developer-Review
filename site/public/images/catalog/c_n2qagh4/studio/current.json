@@ -7,5 +7,6 @@
   "page": "https://www.zhuziplay.com/",
   "provider": "公司标志",
   "image": "https://www.zhuziplay.com/assets/brand-logo.png?v=202607211824",
-  "storage": "r2"
+  "storage": "r2",
+  "logoScale": 3
 }

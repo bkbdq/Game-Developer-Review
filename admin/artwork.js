@@ -2,7 +2,7 @@ import { h } from './lib/dom.js';
 import { isBaikeImage } from './lib/baike-image.js';
 import { sizes } from './lib/artwork-sizes.js';
 import { publishArtwork } from './lib/artwork-publish.js';
-import { readArtworkRepository } from './lib/artwork-repository.js';
+import { readArtworkRepository, artworkUrl } from './lib/artwork-repository.js';
 import { createClient } from './lib/github.js';
 import { createApi } from './lib/api.js';
 import { getToken, setToken, clearToken } from './lib/token.js';
@@ -25,7 +25,12 @@ const STAGE_KEY = 'goodcorp-artwork-staging';
 function loadStage() {
   try {
     const map = JSON.parse(localStorage.getItem(STAGE_KEY) || '{}');
-    return map && typeof map === 'object' && !Array.isArray(map) ? map : {};
+    if (!map || typeof map !== 'object' || Array.isArray(map)) return {};
+    // 旧版暂存只记录出处地址、不含版本，无法直接提交，读取时丢弃。
+    for (const key of Object.keys(map)) {
+      if (!/^[0-9a-f]{16}$/.test(map[key]?.saved?.version || '')) delete map[key];
+    }
+    return map;
   } catch { return {}; }
 }
 function saveStage(map) {
@@ -118,8 +123,8 @@ function draw() {
   $('save').disabled = !e.pick || !e.changed || publishing || !e.loaded;
   $('save').textContent = e.remoteSha ? '保存配图修改' : '提交配图';
   $('stage').hidden = !e.pick || !e.loaded;
-  $('stage').disabled = e.saving || publishing || !e.pick?.image;
-  $('stage').title = e.pick?.image ? '保存到本机暂存区，稍后在配图管理批量上传' : '这张图没有出处地址（本机图片），无法暂存，请直接提交';
+  $('stage').disabled = e.saving || publishing;
+  $('stage').title = '按当前裁切生成展示图并上传到 Cloudflare R2，加入暂存列表稍后批量提交';
   $('discard').hidden = !e.current || !e.changed;
   $('discard').disabled = e.saving;
   $('message').textContent = e.message || '确认后将展示图保存到 Cloudflare R2，原图不进存储桶。';
@@ -451,23 +456,33 @@ async function publish(items, report, onDone) {
       throw err;
     }
     setToken(token);
-    report('正在将展示图保存到 Cloudflare R2…');
+    const stagedCount = items.filter(e => e.staged).length;
+    report(stagedCount === items.length ? '正在将暂存的配图记录提交到正式仓库…' : '正在将展示图保存到 Cloudflare R2…');
     const previews = new Map();
-    const result = await publishArtwork({client:createClient(token), config, items, upload:(...args)=>uploadArtwork(token,...args), prepare:async e => {
-      const prepared = await prepare(e);
-      previews.set(e, {source:webpFile(prepared.source), card:webpFile(prepared.files.card)});
-      return prepared;
-    }});
+    const result = await publishArtwork({client:createClient(token), config, items,
+      upload:async (item, version, files) => { if (!item.staged) await uploadArtwork(token, item, version, files); },
+      prepare:async e => {
+        if (e.staged) return {saved:e.staged.saved, files:{}};
+        const prepared = await prepare(e);
+        previews.set(e, {source:webpFile(prepared.source), card:webpFile(prepared.files.card)});
+        return prepared;
+      }});
     items.forEach((e,i) => {
       const record = result.records[i];
       e.saved = record.saved; e.remoteSha = record.sha; e.changed = false;
       for (const url of new Set([e.current?.local, e.pick?.local, e.thumbnail])) {
         if (url?.startsWith('blob:') && !e.dsCandidates?.some(c => c.local === url)) URL.revokeObjectURL(url);
       }
-      const {source,card} = previews.get(e);
-      e.current = { ...record.saved, file:source, local:URL.createObjectURL(source) };
-      e.pick = e.current;
-      e.thumbnail = URL.createObjectURL(card);
+      const preview = previews.get(e);
+      if (preview) {
+        e.current = { ...record.saved, file:preview.source, local:URL.createObjectURL(preview.source) };
+        e.pick = e.current;
+        e.thumbnail = URL.createObjectURL(preview.card);
+      } else {
+        e.current = { ...record.saved };
+        e.pick = e.current;
+        e.thumbnail = artworkUrl(e, record.saved.version, 'card');
+      }
       e.message = result.message;
       checked.delete(e); proposed.delete(e);
     });
@@ -511,13 +526,14 @@ function stageReview() {
   const items = Object.entries(map);
   $('stage-review').hidden = !items.length;
   $('stage-items').replaceChildren(...items.map(([key, s]) => h('div', {class:'proposal'},
-    h('img', {src:api('image', {url:s.image}), alt:'', referrerPolicy:'no-referrer'}),
-    h('span', {}, h('strong', {}, s.name), h('small', {}, s.provider + ' · ' + s.title)),
+    h('img', {src:artworkUrl(s, s.saved.version, 'card'), alt:'', referrerPolicy:'no-referrer',
+      onerror:ev => ev.target.remove()}),
+    h('span', {}, h('strong', {}, s.name), h('small', {}, s.saved.provider + ' · ' + s.saved.title + ' · 已上传 R2')),
     h('button', {type:'button', 'aria-label':'移除暂存：' + s.name, onclick:() => {
       const rest = loadStage(); delete rest[key]; saveStage(rest);
       stageReview(); directory();
     }}, '移除'))));
-  $('stage-upload').textContent = '批量上传暂存（' + items.length + '）';
+  $('stage-upload').textContent = '批量提交暂存（' + items.length + '）';
   $('stage-upload').disabled = publishing || !items.length || !repository;
   $('stage-clear').disabled = publishing || !items.length;
 }
@@ -533,9 +549,8 @@ $('stage-upload').onclick = () => {
   for (const s of Object.values(map)) {
     const e = entries.find(row => row.company === s.company && row.target === s.target);
     if (!e || e.saving) { skipped.push(s.name); continue; }
-    e.pick = {provider:s.provider, title:s.title, page:s.page, image:s.image};
-    e.mode = s.mode; e.x = Number(s.x); e.y = Number(s.y);
-    e.changed = true; e.loaded = false; e.message = '';
+    e.staged = s;
+    e.changed = true;
     items.push(e);
   }
   $('batch-status').hidden = false;
@@ -552,17 +567,37 @@ $('stage-upload').onclick = () => {
     if (skipped.length) $('batch-status').textContent += '（另有 ' + skipped.length + ' 项未找到对应条目，仍保留在暂存区）';
   });
 };
-$('stage').onclick = () => {
+$('stage').onclick = async () => {
   const e = active;
-  if (!e || !e.pick?.image || e.saving || publishing) return;
-  const map = loadStage();
-  map[e.company + '/' + e.target] = {company:e.company, target:e.target, name:e.name, kind:e.kind, studio:e.studio,
-    mode:e.mode, x:e.x, y:e.y, provider:e.pick.provider, title:e.pick.title || e.name,
-    page:e.pick.page || '', image:e.pick.image, at:Date.now()};
-  saveStage(map);
-  e.message = '已暂存到本机浏览器，回到配图管理可批量上传。';
-  if (active === e) $('message').textContent = e.message;
-  directory(); batchReview(); stageReview();
+  if (!e || !e.pick || !e.loaded || e.saving || publishing) return;
+  const token = getToken() || await askForToken();
+  if (!token) return;
+  try { await createApi(token).me(); }
+  catch (err) {
+    if (err.status === 401 || err.status === 403) clearToken();
+    e.message = '暂存失败 · ' + err.message;
+    refresh(e);
+    return;
+  }
+  setToken(token);
+  e.saving = true;
+  e.message = '正在按当前裁切生成展示图并上传到 Cloudflare R2…';
+  refresh(e);
+  try {
+    const prepared = await prepare(e);
+    await uploadArtwork(token, e, prepared.saved.version, prepared.files);
+    const map = loadStage();
+    map[e.company + '/' + e.target] = {saved: prepared.saved, company:e.company, target:e.target,
+      name:e.name, kind:e.kind, studio:e.studio, at:Date.now()};
+    saveStage(map);
+    e.message = '已按当前裁切上传到 R2 并加入暂存列表，回到配图管理可批量提交。';
+    stageReview();
+  } catch (err) {
+    e.message = '暂存失败 · ' + err.message;
+  } finally {
+    e.saving = false;
+    refresh(e);
+  }
 };
 try {
   let data = await (await request(api('catalog'))).json();

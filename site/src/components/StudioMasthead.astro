@@ -2,21 +2,21 @@
 import Mark from './Mark.astro';
 import { type Company } from '../lib/data';
 import { projectsByStudio } from '../lib/projects';
-import { catalogArtwork } from '../lib/artwork';
+import { catalogArtwork, defaultArtwork } from '../lib/artwork';
 interface Props { company: Company }
 const { company } = Astro.props;
 const titles = projectsByStudio.get(company.slug) ?? [];
-const featured = titles.find(p => p.cover);
 const custom = catalogArtwork(company.id);
-const banner = custom?.banner ?? featured?.cover;
+const featured = !custom && titles.find(p => p.hasArtwork);
+const banner = custom?.banner || (featured && featured.cover) || defaultArtwork;
 ---
 <header class="studio-mast">
-  {banner && <img class="studio-panorama" src={banner} alt="" fetchpriority="high" />}
+  <img class:list={["studio-panorama", { "company-logo": custom?.banner }]} src={banner} alt="" fetchpriority="high" />
   <div class="studio-identity">
     <div class="studio-name"><Mark slug={company.slug}/><div>
       <h1>{company.name}</h1>
     </div></div>
     <div class="studio-metrics"><span><b>{titles.length}</b> 个项目</span><span><b>{company.reviewCount}</b> 篇评价</span></div>
   </div>
-  {!custom && featured && <a class="studio-art-link" href={featured.path}>{featured.name} <span aria-hidden="true">↗</span></a>}
+  {featured && <a class="studio-art-link" href={featured.path}>旗下项目 · {featured.name} ↗</a>}
 </header>

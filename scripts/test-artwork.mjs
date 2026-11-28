@@ -33,6 +33,26 @@ test('常规项目搜索包含 TapTap 同名游戏并去重，不调用 DeepSeek
   assert.deepEqual(candidates.map(c=>[c.provider,c.page,c.image]),[['TapTap','https://www.taptap.cn/app/12',art.original_url]]);
 });
 
+test('公司批查优先已核实的 Logo，未核实的同名 Steam 游戏留待人工选择', async t => {
+  const requests = [];
+  t.mock.method(globalThis, 'fetch', async address => {
+    const url = new URL(address);
+    requests.push(url.href);
+    if (url.pathname === '/api/storesearch/') return Response.json({items:[
+      {id:1234,name:'SUPER NOVA',tiny_image:'https://cdn.steamstatic.com/store/header.jpg'}
+    ]});
+    if (url.pathname === '/api/appdetails') return Response.json({1234:{data:{developers:['其他工作室']}}});
+    return Response.json({data:{list:[]}});
+  });
+  const company = await searchArtwork('多益','company','多益',true);
+  assert.equal(requests.length,0);
+  assert.equal(company.candidates[0].provider,'公司标志');
+  assert.equal(company.candidates[0].batchMatch,true);
+  const project = await searchArtwork('SUPER NOVA','project','乐元素',true);
+  assert.ok(project.candidates.some(c => c.provider === 'Steam'));
+  assert.ok(!project.candidates.some(c => c.batchMatch));
+});
+
 test('DS 直接返回可提交的图片，跳过无法读取的网页，并从过期图片回退到网页主图', async t => {
   assert.throws(()=>deepSeekArtwork('作品','project','工作室',''),e=>e.status===401);
   const page='https://official.example/game', bad='https://other.example/game';
@@ -192,7 +212,8 @@ test('未配置本机 Key 的协作者用审核台身份共享搜索，返回可
     assert.equal(options.headers.Authorization,'Bearer cloud-fixture');
     assert.ok(!options.body.includes('reviewer-fixture'));
     calls++;
-    return Response.json({output:[{type:'web_search_call',action:{sources:[{url:photoPage,title:'作品'}]}}]});
+    return Response.json({output:[{type:'web_search_call',action:{sources:[{url:photoPage,title:'作品'}, {url:'https://official.example/other',title:'其他游戏'}]}},
+      {type:'message',content:[{annotations:[{type:'url_citation',url:photoPage}]}]}]});
   });
   const path = origin+'/api/admin/artwork-search?kind=project&name=Fixture';
   assert.equal((await sharedSearch({request:new Request(path,{method:'POST'}),env})).status,401);

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { href } from './data';
 
+export const defaultArtwork = href('images/studio.webp');
+
 export function catalogArtwork(company: string, target = 'studio') {
   if (!/^c_[a-z0-9_-]+$/.test(company) || !(target === 'studio' || /^p_[a-z0-9_-]+$/.test(target))) return;
   const dir = `images/catalog/${company}/${target}`;

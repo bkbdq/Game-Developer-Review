@@ -1,5 +1,5 @@
 import { companyAliases, detail, href, index } from './data';
-import { catalogArtwork } from './artwork';
+import { catalogArtwork, defaultArtwork } from './artwork';
 import { compareProjects, isRecentPick, projectStats } from './project-stats';
 
 export const asOf = new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date(index.generatedAt));
@@ -16,13 +16,13 @@ export const projects = studios.flatMap(({company:c, data, rating}) => {
     const featuredReview = reviews.find(r=>r.id===project.featuredReviewId)
       ?? reviews.find(r=>r.score>=4) ?? reviews[0];
     const configured = catalogArtwork(c.id, project.id);
-    const thumb = configured?.card;
-    const cover = configured?.cover;
-    const scene = configured?.card;
+    const thumb = configured?.card ?? defaultArtwork;
+    const cover = configured?.cover ?? defaultArtwork;
+    const scene = thumb;
     return {
       id: project.id, name: project.name, statusKey: project.status, status: statuses[project.status] || statuses.unknown,
       company: c.name, companyRating:rating, slug:c.slug, aliases, reviews, featuredReview, cover, thumb, scene,
-      detailArt: configured?.detail, cardArt: configured?.card,
+      hasArtwork: Boolean(configured), detailArt: configured?.detail ?? defaultArtwork, cardArt: thumb,
       path:href(`project/${encodeURIComponent(c.slug)}/${encodeURIComponent(project.id)}/`),
       search:[c.name,c.slug,...aliases,project.name,...(project.aliases ?? [])].join(' ').normalize('NFKC').toLocaleLowerCase(),
       ...projectStats(reviews,asOf)

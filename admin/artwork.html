@@ -12,7 +12,8 @@
   <header class="intro"><div><h1 id="manager-title">配图管理</h1><p>管理所有项目和公司的展示图。</p></div>
     <button id="batch" class="secondary" disabled>批量查找缺图</button></header>
   <p id="batch-status" role="status" hidden></p>
-  <section id="batch-review" hidden aria-label="批量候选"><div id="batch-items"></div><button id="batch-save" disabled>提交勾选的配图</button></section>
+  <p id="batch-publish-status" role="status" hidden></p>
+  <section id="batch-review" hidden aria-label="批量候选"><button id="batch-select" type="button" class="secondary" disabled>全选候选</button><div id="batch-items"></div><button id="batch-save" disabled>提交勾选的配图</button></section>
   <section id="stage-review" hidden aria-label="暂存区"><div id="stage-items"></div>
     <div class="stage-actions"><small>暂存条目（含裁切后的展示图）只保存在本机浏览器，不会上传；批量上传成功后自动清空。</small>
       <div class="stage-buttons"><button id="stage-clear" type="button" class="secondary">清空暂存</button><button id="stage-upload" type="button" class="primary" disabled>批量上传暂存</button></div></div></section>

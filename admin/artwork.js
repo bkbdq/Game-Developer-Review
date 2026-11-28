@@ -90,7 +90,12 @@ function matchesStatus(e) {
 }
 const visible = () => matchingEntries().filter(matchesStatus);
 const imageUrl = c => c.local || api('image', { url: c.image });
-const stateText = e => e.saving ? '提交中' : e.changed ? '待提交' : e.remoteSha ? '已配图' : e.draft ? '本机草稿' : repository ? '缺图' : '未同步';
+function fallbackText(e) {
+  if (e.kind === 'project') return '显示默认项目图';
+  const pictured = entries.some(row => row.company === e.company && row.kind === 'project' && row.remoteSha);
+  return pictured ? '待配 Logo · 显示旗下项目图' : '待配 Logo · 显示默认图';
+}
+const stateText = e => e.saving ? '提交中' : e.changed ? '待提交' : e.remoteSha ? '已配图' : e.draft ? '本机草稿' : repository ? fallbackText(e) : '未同步';
 
 function viewUrl(entry) {
   const url = new URL('/artwork.html',location.origin);
@@ -106,7 +111,7 @@ function directory() {
   const matches = matchingEntries(), list = matches.filter(matchesStatus);
   const configured = matches.filter(e => e.remoteSha).length;
   const counts = {all:matches.length, configured, missing:matches.length - configured};
-  const labels = {all:'全部', configured:'已配图', missing:'缺图'};
+  const labels = {all:'全部', configured:'已配图', missing:'待补专图'};
   for (const btn of $('statuses').children) {
     const key = btn.dataset.status;
     btn.textContent = labels[key] + ' ' + (repository || key === 'all' ? counts[key] : '—');
@@ -146,7 +151,7 @@ function draw() {
   $('context').textContent = e.kind === 'project' ? e.studio + ' / 项目' : '公司';
   $('state').textContent = stateText(e);
   $('query').value = e.term;
-  $('search-sources').textContent = e.kind === 'company' ? '图片来源：Steam 开发者主页、百度百科、维基共享资源、英文维基百科' : '图片来源：Steam、TapTap、腾讯应用宝、百度百科、英文维基百科';
+  $('search-sources').textContent = e.kind === 'company' ? '图片来源：已核实的公司标志、Steam 开发者主页、百度百科、维基共享资源、英文维基百科' : '图片来源：Steam、TapTap、腾讯应用宝、百度百科、英文维基百科';
   updateWebSearch(e);
   const found = e.dsCandidates || [];
   const promoted = new Set(found.map(c => c.image));
@@ -209,6 +214,7 @@ function choose(e, candidate, existing = '') {
   const previous = e.pick;
   if (previous?.local?.startsWith('blob:') && previous !== candidate && previous !== e.current &&
       !e.dsCandidates?.includes(previous)) URL.revokeObjectURL(previous.local);
+  if (previous !== candidate) checked.delete(e);
   e.pick = candidate;
   if (existing) {
     e.x = candidate.x; e.y = candidate.y; e.mode = candidate.mode; e.changed = existing === 'draft';
@@ -220,7 +226,7 @@ function choose(e, candidate, existing = '') {
   img.onload = () => {
     if (e.pick !== candidate) return;
     e.loaded = true;
-    const origin = candidate.storage === 'r2' ? 'Cloudflare R2' : '仓库 main';
+    const origin = candidate.storage === 'r2' ? '记录的图片出处' : '仓库 main';
     e.message = '原图 ' + img.naturalWidth + ' × ' + img.naturalHeight + (existing === 'remote' ? ' · 来自' + origin : existing === 'draft' ? ' · 本机旧草稿，可直接提交' : existing === 'staged' ? ' · 本机暂存，可调整后重新暂存或直接批量上传' : ' · 确认后可提交');
     refresh(e);
   };
@@ -229,10 +235,15 @@ function choose(e, candidate, existing = '') {
     e.message = '这张图暂时无法读取，请选其他候选图或从本机选图。';
     refresh(e);
   };
+  e.reading = new Promise(resolve => {
+    img.addEventListener('load', () => resolve(e.pick === candidate && e.loaded), {once:true});
+    img.addEventListener('error', () => resolve(false), {once:true});
+  });
   img.src = imageUrl(candidate);
+  return e.reading;
 }
 
-async function search(e, term) {
+async function search(e, term, batchLookup = false) {
   const ticket = ++e.ticket;
   e.term = term;
   if (e.dsTerm && e.dsTerm !== term) {
@@ -243,7 +254,7 @@ async function search(e, term) {
   e.searchStatus = '正在查找「' + term + '」…';
   if (active === e) draw();
   try {
-    const result = await (await request(api('search', {q:term, kind:e.kind}))).json();
+    const result = await (await request(api('search', {q:term, kind:e.kind, studio:e.studio, batch:batchLookup ? '1' : '0'}))).json();
     if (ticket !== e.ticket) return;
     e.candidates = result.candidates;
     e.baikeQuery = term;
@@ -256,7 +267,8 @@ async function search(e, term) {
     if (result.baikeConfigured === false) e.searchStatus += ' · 百度百科自动取图需配置密钥。可打开词条，复制图片或图片地址，在此页按 Ctrl+V。';
     if (result.choice === -1) e.searchStatus += ' · AI 未找到可靠匹配，请人工核对';
     else if (result.choice != null) e.searchStatus += ' · AI 推荐已排在首位';
-    if (e.candidates.length && result.choice !== -1 && !e.remoteSha && !e.saving && !e.pick) choose(e, e.candidates[0]);
+    const first = e.candidates.find(c => c.batchMatch);
+    if (first && result.choice !== -1 && !e.remoteSha && !e.saving && !e.pick) await choose(e, first);
   } catch (err) {
     if (ticket !== e.ticket) return;
     e.searchStatus = err.message;
@@ -304,8 +316,20 @@ async function openRemote(e) {
   finally { e.loading = false; }
 }
 
+function batchRows() {
+  return visible().filter(e => proposed.has(e) && !e.remoteSha && e.pick);
+}
+function selectableRows() {
+  return batchRows().filter(e => e.loaded && !e.saving);
+}
+$('batch-select').onclick = () => {
+  const rows = selectableRows();
+  const clear = rows.every(e => checked.has(e));
+  for (const e of rows) { if (clear) checked.delete(e); else checked.add(e); }
+  batchReview();
+};
 function batchReview() {
-  const rows = [...proposed].filter(e => !e.remoteSha && e.pick);
+  const rows = batchRows();
   $('batch-review').hidden = !rows.length;
   $('batch-items').replaceChildren(...rows.map(e => {
     const box = h('input', { type:'checkbox', checked:checked.has(e), disabled:publishing || e.saving || !e.loaded,
@@ -314,7 +338,10 @@ function batchReview() {
       h('span', {}, h('strong', {}, e.name), h('small', {}, e.pick.provider + ' · ' + e.pick.title))),
       h('button', {onclick: () => openEntry(e)}, '核对'));
   }));
-  const count = rows.filter(e => checked.has(e) && e.loaded).length;
+  const eligible = selectableRows();
+  const count = eligible.filter(e => checked.has(e)).length;
+  $('batch-select').disabled = publishing || !eligible.length;
+  $('batch-select').textContent = eligible.length && count === eligible.length ? '取消全选' : '全选候选（' + eligible.length + '）';
   $('batch-save').textContent = '提交勾选的配图（' + count + '）';
   $('batch-save').disabled = publishing || !count;
 }
@@ -358,7 +385,7 @@ function followLocation() {
 }
 function updateFilters() {
   history.replaceState(null,'',viewUrl());
-  directory();
+  directory(); batchReview();
 }
 for (const id of ['back','home']) $(id).onclick = ev => {
   if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
@@ -381,10 +408,11 @@ function clearDeepSeekCandidates(e) {
   for (const c of e.dsCandidates || []) if (c !== e.pick) URL.revokeObjectURL(c.local);
   e.dsCandidates = [];
 }
-async function searchDeepSeek(e) {
+async function searchDeepSeek(e, batchLookup = false) {
   const term = e.term.trim();
   if (!term || e.dsBusy || e.saving) return;
   e.dsBusy = true;
+  e.dsError = null;
   if (term !== e.dsTerm) {
     clearDeepSeekCandidates(e);
     e.dsTerm = term;
@@ -404,7 +432,7 @@ async function searchDeepSeek(e) {
     let response;
     try { response = await run(getToken()); }
     catch (err) {
-      if (err.status !== 401) throw err;
+      if (err.status !== 401 || batchLookup) throw err;
       clearToken();
       const token = await askForToken();
       if (!token) { e.dsStatus = '已取消共享找图。'; return; }
@@ -423,10 +451,12 @@ async function searchDeepSeek(e) {
       const providers = [...new Set(e.dsCandidates.map(c => c.provider))].join('、');
       const found = e.dsCandidates.some(c => c.provider === 'DeepSeek') ? '找到' : 'DeepSeek 未取到可用原图，常规来源补充了';
       e.dsStatus = found + ' ' + count + ' 张图片（' + providers + '），已放在选择栏最前面。';
-      if (!e.remoteSha && !e.pick && !e.saving) choose(e,e.dsCandidates[0]);
+      const first = e.dsCandidates.find(c => c.provider === 'DeepSeek' || c.batchMatch);
+      if (first && !e.remoteSha && (!e.pick || !e.loaded) && !e.saving) await choose(e, first);
       if (active === e) $('candidates').scrollLeft = 0;
     } else e.dsStatus = '未找到可用图片。请换用项目正式名称、英文名或公司全称。';
   } catch (err) {
+    e.dsError = err;
     e.dsStatus = err.message;
   } finally { e.dsBusy = false; refresh(e); }
 }
@@ -559,23 +589,37 @@ $('save').onclick = () => {
 $('batch').onclick = async () => {
   if (batch) { batch.stop = true; $('batch').disabled = true; return; }
   batch = {stop:false};
+  if (!publishing) $('batch-publish-status').hidden = true;
   const todo = visible().filter(e => !e.remoteSha);
-  let done = 0;
+  let done = 0, dsCount = 0, dsFailure = '';
   $('batch').textContent = '停止批量查找'; $('batch-status').hidden = false;
   for (const e of todo) {
     if (batch.stop) break;
     $('batch-status').textContent = '正在查找 ' + (done + 1) + ' / ' + todo.length + ' · ' + e.name;
-    if (!e.pick) await search(e, e.term);
-    if (e.pick) proposed.add(e);
+    if (!e.pick) await search(e, e.term, true);
+    if (e.reading) await e.reading;
+    if (e.loaded) proposed.add(e);
     done++; batchReview();
   }
-  $('batch-status').textContent = '已检查 ' + done + ' 项，找到 ' + todo.filter(e => proposed.has(e)).length + ' 项候选。勾选归属正确的配图后可一起提交。';
+  const remaining = todo.filter(e => !e.remoteSha && !e.loaded);
+  for (const e of remaining) {
+    if (batch.stop || dsFailure) break;
+    if (e.remoteSha || e.loaded) continue;
+    $('batch-status').textContent = '常规查找已完成。DeepSeek 补查 ' + (dsCount + 1) + ' / ' + remaining.length + ' · ' + e.name;
+    dsCount++;
+    await searchDeepSeek(e, true);
+    if ([401,402,403,429,503].includes(e.dsError?.status)) dsFailure = e.dsError.message;
+    if (e.loaded && !e.remoteSha) proposed.add(e);
+    batchReview();
+  }
+  $('batch-status').textContent = '已检查 ' + done + ' 项，找到 ' + todo.filter(e => proposed.has(e)).length + ' 项候选。DeepSeek 已补查 ' + dsCount + ' 项。' + (dsFailure ? '后续 AI 补查已暂停：' + dsFailure + '。' : '') + '请核对归属后勾选提交。';
   batch = null; $('batch').textContent = '批量查找缺图'; directory();
 };
 $('batch-save').onclick = () => {
-  const list = [...checked].filter(e => !e.remoteSha && e.loaded);
-  $('batch-status').hidden = false;
-  void publish(list, msg => { $('batch-status').textContent = msg; });
+  const list = selectableRows().filter(e => checked.has(e));
+  const receipt = $('batch-publish-status');
+  receipt.hidden = false;
+  void publish(list, msg => { receipt.textContent = msg; });
 };
 
 let stageThumbs = [];

@@ -107,7 +107,7 @@ export function createArtworkLibrary(root, { deepSeekKey = process.env.DEEPSEEK_
       if (action === 'search') {
         const term = p.q?.trim();
         if (!term || term.length > 100 || !['project','company'].includes(p.kind)) throw error('请输入有效名称');
-        return reply(res, await searchArtwork(term, p.kind));
+        return reply(res, await searchArtwork(term, p.kind, (p.studio || '').trim().slice(0,180), p.batch === '1'));
       }
       let image;
       if (action === 'image') image = await downloadImage(p.url);

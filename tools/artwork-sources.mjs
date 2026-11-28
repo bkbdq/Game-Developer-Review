@@ -4,11 +4,14 @@ import { isBaikeImage } from '../admin/lib/baike-image.js';
 
 const aliases = JSON.parse(readFileSync(new URL('../admin/lib/aliases.json', import.meta.url), 'utf8'));
 
+const profiles = JSON.parse(readFileSync(new URL('./company-logo-sources.json', import.meta.url), 'utf8'));
+const verifiedImages = new Map(profiles.map(p => [p.image, p]));
+
 const agent = 'goodcorp-artwork/1.0 (+https://goodcorp.games/)';
 const maxBytes = 12 * 1024 * 1024;
 const imageHosts = new Set(['upload.wikimedia.org', 'thumb.wikimedia.org', 'static.pc.yyb.qq.com', 'pp.myapp.com',
   'avatars.cdn.queniuqe.com','avatars.st.dl.eccdnx.com']);
-export const onlineProviders = ['Steam', 'TapTap', '腾讯应用宝', '百度百科', '英文维基百科', '维基共享资源', 'DeepSeek'];
+export const onlineProviders = ['公司标志', 'Steam', 'TapTap', '腾讯应用宝', '百度百科', '英文维基百科', '维基共享资源', 'DeepSeek'];
 const clean = s => s.normalize('NFKC').toLowerCase().replace(/[\p{P}\p{Z}]/gu, '');
 
 export function lookupNames(term, kind) {
@@ -40,7 +43,7 @@ function allowedImage(value) {
   try {
     const u = new URL(value);
     return u.protocol === 'https:' && !u.username && !u.password && !u.port &&
-      (isBaikeImage(value) ||
+      (verifiedImages.has(value) || isBaikeImage(value) ||
         imageHosts.has(u.hostname) || u.hostname.endsWith('.tapimg.com') || u.hostname.endsWith('.steamstatic.com') ||
         u.hostname.endsWith('.steamusercontent.com'));
   } catch {
@@ -53,6 +56,14 @@ export async function downloadImage(value) {
   const response = await fetch(value, {
     redirect: 'error', headers: { 'User-Agent': agent }, signal: AbortSignal.timeout(15000),
   });
+  if (response.ok && verifiedImages.has(value)) {
+    const profile = verifiedImages.get(value);
+    const {default: sharp} = await import('sharp');
+    const bytes = await limitedBytes(response.body);
+    let image = sharp(bytes, {density:144, limitInputPixels:40000000});
+    if (profile.background) image = image.flatten({background:profile.background});
+    return {bytes:await image.resize({width:1600,height:1000,fit:'inside',withoutEnlargement:true}).png().toBuffer(),mime:'image/png'};
+  }
   const mime = response.headers.get('content-type')?.split(';')[0];
   if (!response.ok || !['image/png', 'image/jpeg', 'image/webp'].includes(mime)) {
     throw new Error('来源未返回可用图片，请换一张');
@@ -70,7 +81,7 @@ async function query(base, params) {
   return response.json();
 }
 
-async function steam({ name, english }) {
+async function steam({ name, english }, studio) {
   const find = async term => {
     const search = await query('https://store.steampowered.com/api/storesearch/', { term, l: 'schinese', cc: 'cn' });
     const matches = search.items.filter(item => Number.isSafeInteger(item.id) &&
@@ -90,6 +101,11 @@ async function steam({ name, english }) {
     const info = await query('https://store.steampowered.com/api/appdetails', { appids: first.id, l: 'schinese', cc: 'cn' });
     const game = info[first.id]?.data;
     if (game?.header_image) capsules[0].image = game.header_image;
+    if (studio && [name, english].some(n => n && clean(n) === clean(first.name))) {
+      const identity = lookupNames(studio, 'company');
+      const credits = [...(game?.developers || []), ...(game?.publishers || [])].map(clean);
+      if ([studio,identity.name,...identity.aliases].some(n => credits.includes(clean(n)))) capsules[0].batchMatch = true;
+    }
     const shots = (game?.screenshots ?? []).slice(0, 2).map((shot, i) => ({
       provider: 'Steam', title: first.name + ' · 截图 ' + (i + 1), page: page(first.id), image: shot.path_full,
     }));
@@ -219,21 +235,24 @@ async function modelChoice(term, kind, candidates) {
   return index;
 }
 
-export async function searchArtwork(term, kind) {
+export async function searchArtwork(term, kind, studio = '', quick = false) {
   const baikeKey = process.env.BAIDU_BAIKE_API_KEY?.trim();
-  const key = JSON.stringify([term, kind, Boolean(baikeKey)]);
+  const key = JSON.stringify([term, kind, studio, quick, Boolean(baikeKey)]);
   const cached = cache.get(key);
   if (cached?.until > Date.now()) return cached.result;
   const names = lookupNames(term, kind);
+  const profile = kind === 'company' && profiles.find(p => [term,names.name].some(n => clean(n) === clean(p.name)));
+  const brand = profile && {provider:'公司标志',title:profile.name + ' · Logo',page:profile.page,image:profile.image,batchMatch:true};
+  if (brand && quick) return {candidates:[brand],warnings:[],choice:null,lookup:names.name,baikeConfigured:Boolean(baikeKey)};
   const providers = kind === 'company'
     ? [['Steam', () => steamDeveloper(names)], ['维基共享资源', () => commons(names.english || names.name)]]
-    : [['Steam', () => steam(names)], ['TapTap', () => tapTap(names)], ['腾讯应用宝', () => appStore(names)]];
+    : [['Steam', () => steam(names, studio)], ['TapTap', () => tapTap(names)], ['腾讯应用宝', () => appStore(names)]];
   if (baikeKey) providers.push(['百度百科', () => baike(names.name, baikeKey)]);
   if (names.english) providers.push(['英文维基百科', () => englishWiki(names.english, kind)]);
   const responses = await Promise.allSettled(providers.map(([, search]) => search()));
   const warnings = [];
-  const candidates = [];
-  const seen = new Set();
+  const candidates = brand ? [brand] : [];
+  const seen = new Set(brand ? [brand.image] : []);
   responses.forEach((response, i) => {
     if (response.status === 'rejected') warnings.push(providers[i][0] === '百度百科'
       ? '百度百科接口请求失败，可打开词条选图' : providers[i][0] + ' 暂时无法连接');
@@ -246,8 +265,14 @@ export async function searchArtwork(term, kind) {
       candidates.push(item);
     }
   });
+  for (const c of candidates) {
+    if (kind === 'company' && (['Steam','维基共享资源'].includes(c.provider) ||
+        (c.provider === '英文维基百科' && clean(c.title) === clean(names.english || names.name) && /logo|wordmark/i.test(c.image)))) c.batchMatch = true;
+    if (kind === 'project' && ['TapTap','腾讯应用宝'].includes(c.provider)) c.batchMatch = true;
+  }
   // 优先展示商店封面和截图，方形图标排在最后。
   function rank(item) {
+    if (item === brand) return -1;
     if (item.title.endsWith(' · 图标') || /\/capsule_231x87/i.test(item.image)) return 2;
     if (item.provider === 'Steam' && [names.name,names.english].some(s => s && clean(s) === clean(item.title))) return 0;
     return 1;
